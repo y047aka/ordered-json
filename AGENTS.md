@@ -6,6 +6,7 @@ The JSON value that keeps an object's properties in the order they were authored
 
 - The library owns `OrderedJson.Value`, the traversal, the escaping, the number spelling, `Layout`, `Inline`, and the `{ ... }` padding a collapsed object gets.
 - The consumer owns which layout its files use with which `Inline` rule — `Layout.Inlined(Inline.AtMost(2))` — and the fact that it appends a key (`index`, `position`) to a value another module wrote. Its `Extra` module does not come here; it only picks a layout now, which is what makes it the consumer's and not ours.
+- Where the standard module already named a function, its name and argument order are reused: `toPrettyString(indent, v)` and `toCompactString(v)`. The type and case names are not, because both modules are installed at once and `JObject` naming a `Map` there and a `List` here is a trap.
 - Naming is decided: repo `ordered-json`, module `OrderedJson`, value type `OrderedJson.Value`. The case names stay `JsonNull` … `JsonObject`. Shortening them invites a case named `String` beside the type `String`, and matching the standard `JNull` … `JObject` would name two different things alike — the standard `JObject` holds a `Map`. Rename the path, not the cases. `Layout` stays `Layout`, since it says what the cases are.
 - The inline rule governs objects and not arrays, which is a frozen byte-level fact and not an oversight.
 
@@ -14,7 +15,11 @@ The JSON value that keeps an object's properties in the order they were authored
 - `Util.Json.Json.JObject` is `Map[String, Json]`, documented as canonical sorted key order. That is the reason this module exists.
 - `Util.Json.Json.JArray` is `Vector[Json]` and closed, so it cannot hold an ordered object. The recursive type therefore stays here.
 - `Util.Json.Json.JNumber` is `BigDecimal`. A `Float64` enters it through `new BigDecimal(x)`, so `0.20739060549440685` becomes `0.207390605494406854436562070986838079988956451416015625`, and `Int32` and `Float64` become the same case. Numbers stay home-grown.
-- `Util.Json.toPrettyString(2, j)` gives 2-space indent, `": "` after the key, `{}` and `[]` when empty, one element per line — the same bytes as `Layout.Expanded` apart from key order, and from any `Float64` it widens to its exact decimal. No claim of byte-identity with the standard module survives a `Float64`.
+- `Util.Json.toPrettyString(2, j)` gives 2-space indent, `": "` after the key, `{}` and `[]` when empty, one element per line — the same bytes as `Layout.Expanded` apart from key order, and from any `Float64` it widens to its exact decimal. No claim of byte-identity with the standard module survives a `Float64`. The comparison is a test now (`TestStandard`), on a document whose keys happen to be in the order a `Map` would sort them.
+- The standard module spells a number `BigDecimal.toPlainString(n)` where this one writes `"${n}"`. Both give `1` for a parsed `1`; they part company at any `Float64`.
+- The standard module's own layout type, `Style` (`Compact` / `Pretty(Int32)`), is not `pub`, so there is no public layout to align to. What is public and shared is the `indent` argument, which is why `Layout` carries no indent and `toPrettyString(indent, v)` does.
+- `Util.Json.parse` puts an object into a `Map`, so an order-preserving `parse` cannot be built on it — the order is gone before any encoder is asked for it. `parse`, `decode`, and `FromJson` are therefore not on the compatibility list, and neither is `toRichString`.
+- `Util.Json` has `instance ToString[Json] = toCompactString` and `instance Formattable[Json] = toRichString(2, ·)`. The aligned `instance ToString[Value]` is the next step and was left undone because no caller reached it.
 - `Util.Json` is the standard library's own module: a project may nest under it, which is why the module could live at `Util.Json.Encode`, but Flix 0.79 refuses a second declaration of it.
 - `Util.Json.parse` refuses a duplicate key with `DuplicateKey`, and accepts a raw control character inside a string. It is therefore a fence on key order and not on escaping.
 - `Eq[BigDecimal]` is `compareTo == 0`, scale-insensitive, so `render → parse → == the expected Json` is sound for floats.
@@ -26,7 +31,7 @@ The JSON value that keeps an object's properties in the order they were authored
 | Command | Purpose |
 | --- | --- |
 | `flix build` | compile |
-| `flix test` | 30 tests |
+| `flix test` | 35 tests |
 | `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
 | `flix release` | publish a version to GitHub |
 

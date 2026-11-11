@@ -10,16 +10,29 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
     use OrderedJson.Value.{JsonNull, JsonBool, JsonInt, JsonFloat, JsonString, JsonArray, JsonObject}
 
-    OrderedJson.render(value)                                   -- every value on a line of its own, 2-space indent
-    OrderedJson.renderWith(Layout.Inlined(Inline.AtMost(2)), v) -- an object small enough to fit joins its key's line
-    OrderedJson.renderWith(Layout.OneLine, v)                   -- one line, however many properties it holds
+    OrderedJson.toPrettyString(2, value)                        -- every value on a line of its own, as the standard module writes it
+    OrderedJson.toCompactString(value)                          -- no extraneous whitespace, as the standard module writes it
+    OrderedJson.render(value)                                   -- toPrettyString(2, ·), the standard module's own default
+    OrderedJson.renderWith(Layout.Inlined(Inline.AtMost(2)), 2, value) -- an object small enough to fit joins its key's line
+    OrderedJson.renderWith(Layout.OneLine, 2, value)            -- one line, however many properties it holds
+
+## Where the standard module's names are reused
+
+`toPrettyString` and `toCompactString` are `Util.Json`'s names and its argument order, so switching a caller between the two modules is a change of prefix. `Layout` carries no indent: the standard module keeps the indent an argument, and so does this one.
+
+| `Util.Json`                 | `OrderedJson`                     | bytes |
+| --- | --- | --- |
+| `toCompactString(j)`        | `toCompactString(v)`              | identical for a document the standard module spells the same way |
+| `toPrettyString(indent, j)` | `toPrettyString(indent, v)`       | identical, same argument order |
+| `parse`, `decode`           | not here                          | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
+| `Json`, `JNull` … `JObject` | `Value`, `JsonNull` … `JsonObject` | deliberately apart: both modules are installed at once, and `JObject` naming a `Map` here as well as there is a trap |
 
 ## What the library guarantees
 
 - Pure: no effect annotation, and no dependency.
 - A string is quoted and escaped by the standard module, so every character below 0x20 reaches the output escaped.
-- Numbers keep the Flix spelling: `JsonInt(42)` writes `42` and `JsonFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than becoming the 55-digit `BigDecimal` expansion.
-- `Layout.Expanded` is byte-identical to `Util.Json.toPrettyString(2, ·)` apart from key order, and from any `Float64` the standard module would widen to its exact decimal.
+- Numbers keep the Flix spelling: `JsonInt(42)` writes `42` and `JsonFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than becoming the 55-digit `BigDecimal` expansion the standard module writes.
+- The two standard-named renderings are compared against the standard module's own output in `TestStandard`, for a document whose keys happen to be in the order a `Map` would sort them. No claim of byte-identity survives a `Float64`.
 
 ## What is not the library's business
 
@@ -36,6 +49,7 @@ Two things the frozen bytes pinned on the library instead. A collapsed object is
 | `Expanded`      | one line per item | one line per property                                                 |
 | `Inlined(rule)` | one line per item | per property, unless `rule` admits the count and every value fits → one line |
 | `OneLine`       | `[1, 2]`          | `{ "k": v, … }`, however many properties                              |
+| `Compact`       | `[1,2]`           | `{"k":v}`, however many properties — the standard module's compact bytes |
 
 ## Consumed by
 

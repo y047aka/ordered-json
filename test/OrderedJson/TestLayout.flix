@@ -8,10 +8,10 @@ pub mod OrderedJson.TestLayout {
     use OrderedJson.Value.{JsonNull, JsonInt, JsonString, JsonArray, JsonObject}
 
     def inlined(value: OrderedJson.Value): String =
-        renderWith(Layout.Inlined(Inline.AtMost(2)), value)
+        renderWith(Layout.Inlined(Inline.AtMost(2)), 2, value)
 
     def onOneLine(value: OrderedJson.Value): String =
-        renderWith(Layout.OneLine, value)
+        renderWith(Layout.OneLine, 2, value)
 
     @Test
     def testRenderScalar(): Unit \ Assert =
