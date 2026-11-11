@@ -1,0 +1,7 @@
+*.fpkg
+*.jar
+artifact/
+build/
+crash_report_*.txt
+.DS_Store
+lib/
