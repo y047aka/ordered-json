@@ -1,24 +1,28 @@
+/*
+ * Copyright 2026 Yoshitaka Totsuka
+ *
+ * The module is `Util/Json.flix` of the Flix standard library, copyright the Flix Authors, Apache 2.0,
+ * re-shaped around an ordered object. Its docstrings are kept where they still describe this file.
+ *
+ * Use of this source code is governed by the Apache 2.0 license
+ * that can be found in the LICENSE.md file.
+ */
+
 ///
 /// Type of JSON values, and its functions.
 ///
-/// The shape of this module — the two public renderers, the writer underneath them, and the names
-/// `write`, `breakIndent`, `writeColon`, `writeIndent`, `escapeString` — is `Util.Json`'s, and it was
-/// written against `Util/Json.flix` at flix/flix master. The wording is this repository's own: the
-/// standard library is Apache 2.0 and this one is MIT, so the structure could be taken and the
-/// sentences could not.
+/// What differs from `Util.Json` is the key order, and the collapse.
+/// An object here is a `List` of key and value pairs and not a `Map`, so the output order is the order the properties were authored in.
 ///
-/// What differs is the key order, and the collapse. An object here is a `List` of key and value pairs
-/// and not a `Map`, so the output order is the order the properties were authored in.
-///
-
 pub mod OrderedJson {
 
     ///
     /// Type of JSON values.
     ///
-    /// JSON numbers are kept as `Int32` and `Float64`, which spells a `Float64` the way `Double.toString`
-    /// spells it rather than as the exact decimal a `BigDecimal` widens it to; JSON objects are kept as
-    /// `List[(String, Json)]`, which gives the authored key order on output.
+    /// JSON numbers are kept as `Int32` and `Float64`, which spells a `Float64` the way `Double.toString` spells it
+    /// and not as the exact decimal a `BigDecimal` widens it to;
+    /// JSON objects are kept as `List[(String, Json)]`, which gives
+    /// the authored key order on output.
     ///
     pub enum Json with Eq {
         case JsonArray(List[Json])
@@ -45,8 +49,7 @@ pub mod OrderedJson {
     }
 
     ///
-    /// Controls the layout used by `write`: how far the rendering breaks lines, and how much whitespace it
-    /// keeps between the tokens.
+    /// Controls the layout used by `write`.
     ///
     /// The indentation per nesting level is not part of it. `toPrettyString` takes it as its own argument,
     /// as the standard module does, and two of the four layouts have no indentation to take.
@@ -73,8 +76,10 @@ pub mod OrderedJson {
     ///
     /// Returns the pretty-printed JSON rendering of `j`, using `indent` spaces per nesting level.
     ///
-    /// Empty arrays and objects are rendered on a single line as `[]` or `{}`. Non-empty containers place
-    /// each element on its own line; object keys are followed by `": "`.
+    /// Empty arrays and objects are rendered on a single line as `[]` or `{}`.
+    /// Non-empty containers place each element on its own line; object keys are followed by `": "`.
+    ///
+    /// `Layout.Inlined` is the exception this library exists to add: an object the rule admits is written on the line its own key stands on.
     ///
     pub def toPrettyString(indent: Int32, j: Json): String =
         renderWith(Layout.Pretty, indent, j)
@@ -96,7 +101,7 @@ pub mod OrderedJson {
     ///
     /// Returns the JSON rendering of `j` under `layout`.
     ///
-    /// `d` is the current nesting level (0 at the root); it is ignored by the layouts that break no line.
+    /// `d` is the current nesting level (0 at the root); it is ignored in `Compact` and `OneLine` styles.
     /// Empty arrays and objects always render as `[]` or `{}`.
     ///
     def write(j: Json, d: Int32, layout: Layout, indent: Int32): String =
@@ -165,19 +170,20 @@ pub mod OrderedJson {
         }
 
     ///
-    /// A newline followed by the indentation for nesting level `d`: where the line breaks, and how far in.
+    /// A newline followed by the indentation for nesting level `d`.
     ///
     def breakIndent(indent: Int32, d: Int32): String =
         "\n${writeIndent(indent * d)}"
 
     ///
-    /// `n` spaces. The empty string if `n <= 0`.
+    /// `n` spaces.
+    /// Does nothing if `n <= 0`.
     ///
     def writeIndent(n: Int32): String =
         if (n > 0) String.repeat(n, " ") else ""
 
     ///
-    /// The object key/value separator: `":"` in `Compact`, `": "` in the styles that keep a space there.
+    /// The object key/value separator: `":"` in `Compact` style and `": "` in every other style.
     ///
     def writeColon(layout: Layout): String =
         if (layout == Layout.Compact) ":" else ": "
@@ -197,7 +203,7 @@ pub mod OrderedJson {
         not String.contains({substr = "\n"}, rendered)
 
     ///
-    /// The JSON rendering of a string: quoted, with every character below 0x20 escaped.
+    /// Returns `s` as a JSON string literal: enclosed in double quotes, with backslash, double-quote, and control characters escaped per RFC 8259.
     ///
     /// The standard module's own `escapeString` is not `pub`, and this is its public route — the one thing
     /// here that the standard module is still asked to do.

@@ -55,3 +55,7 @@ Two things the frozen bytes pinned on the library instead. A collapsed object is
 ## Consumed by
 
 `elm-motorsport-analysis` writes its timing archive with it: a 25 MB round summary, and 24,146 one-line lap records. Its check is byte identity — the five exported files hash the same before and after any change here, which is the only specification that has ever held.
+
+## License
+
+Apache 2.0, the same license as the Flix standard library. The module is that library's `Util/Json.flix` re-shaped around an ordered object, and the docstrings that still describe it are that file's; `src/OrderedJson.flix` says so at its top, and `LICENSE.md` is the file the standard library's own header points to.
