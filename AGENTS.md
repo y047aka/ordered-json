@@ -5,32 +5,28 @@ The JSON value that keeps an object's properties in the order they were authored
 ## Where the boundary is
 
 - The library owns `OrderedJson.Value`, the traversal, the escaping, the number spelling, `Layout`, `Inline`, and the `{ ... }` padding a collapsed object gets.
-- The consumer owns which layout its files use and with what `Inline` rule, the fact that it appends a key (`index`, `position`) to a value another module wrote, and — since the extraction — the ≤2 property count itself, which it passes as `Layout.Inlined(Inline.AtMost(2))`.
-- Naming is decided: repo `ordered-json`, module `OrderedJson`, value type `OrderedJson.Value`. The case names stay `JsonNull` … `JsonObject`. Shortening them invites a case named `String` beside the type `String`, and matching the standard `JNull` … `JObject` would name two different things alike — the standard `JObject` holds a `Map`. Rename the path, not the cases.
-- `Layout` stays `Layout`. The standard library's own `Style` (`Compact` / `Pretty(Int32)`) is not `pub`, so it no longer collides, but `Layout` says what the cases are.
-- The inline rule governs objects and not arrays, which is a frozen byte-level fact and not an oversight: under `Layout.Inlined(Inline.AtMost(2))` an array of two short strings still takes one element per line.
-- The consumer's `Extra` module does not come here. It now holds no rule of its own either — it only picks a layout — which is what makes it the consumer's and not ours.
+- The consumer owns which layout its files use with which `Inline` rule — `Layout.Inlined(Inline.AtMost(2))` — and the fact that it appends a key (`index`, `position`) to a value another module wrote. Its `Extra` module does not come here; it only picks a layout now, which is what makes it the consumer's and not ours.
+- Naming is decided: repo `ordered-json`, module `OrderedJson`, value type `OrderedJson.Value`. The case names stay `JsonNull` … `JsonObject`. Shortening them invites a case named `String` beside the type `String`, and matching the standard `JNull` … `JObject` would name two different things alike — the standard `JObject` holds a `Map`. Rename the path, not the cases. `Layout` stays `Layout`, since it says what the cases are.
+- The inline rule governs objects and not arrays, which is a frozen byte-level fact and not an oversight.
 
 ## Facts about the standard library already paid for; do not re-derive them
 
 - `Util.Json.Json.JObject` is `Map[String, Json]`, documented as canonical sorted key order. That is the reason this module exists.
 - `Util.Json.Json.JArray` is `Vector[Json]` and closed, so it cannot hold an ordered object. The recursive type therefore stays here.
 - `Util.Json.Json.JNumber` is `BigDecimal`. A `Float64` enters it through `new BigDecimal(x)`, so `0.20739060549440685` becomes `0.207390605494406854436562070986838079988956451416015625`, and `Int32` and `Float64` become the same case. Numbers stay home-grown.
-- `Util.Json.toPrettyString(2, j)` gives 2-space indent, `": "` after the key, `{}` and `[]` when empty, one element per line — the same bytes as `Layout.Expanded` apart from key order.
+- `Util.Json.toPrettyString(2, j)` gives 2-space indent, `": "` after the key, `{}` and `[]` when empty, one element per line — the same bytes as `Layout.Expanded` apart from key order, and from any `Float64` it widens to its exact decimal. No claim of byte-identity with the standard module survives a `Float64`.
+- `Util.Json` is the standard library's own module: a project may nest under it, which is why the module could live at `Util.Json.Encode`, but Flix 0.79 refuses a second declaration of it.
 - `Util.Json.parse` refuses a duplicate key with `DuplicateKey`, and accepts a raw control character inside a string. It is therefore a fence on key order and not on escaping.
 - `Eq[BigDecimal]` is `compareTo == 0`, scale-insensitive, so `render → parse → == the expected Json` is sound for floats.
 - Flix string literals have no `\b`, `\f` or `\uXXXX`. Char literals do, and `Char.toString('\u0008')` is how a test builds one.
-- `flix install` resolves `owner/name[@ver]` from GitHub and `flix release` publishes there. There is no local-path dependency. `[jar-dependencies]` does exist in `flix.toml`, which is how the consumer can take this without a release.
-- `Util.Json` is the standard library's own module: a project may nest under it, which is why the module could live at `Util.Json.Encode`, but Flix 0.79 refuses a second declaration of it (`Duplicate module`, pointing at the stdlib's `Util/Json.flix`). So the consumer's `Extra` had to move out to `Util.Json.Extra` the moment `Encode` left, or be orphaned.
-- A Flix module must be declared in the file that matches its name, so a test module `OrderedJson.TestValue` lives at `test/OrderedJson/TestValue.flix`.
-- A Flix `def` always takes parameters — there is no top-level value — so a caller's layout is written at each call site rather than bound once in a module. Flix has no `as` on `use` either, which is why the rename reaches every type annotation and not only the `use` lines.
+- `flix install` resolves `owner/name[@ver]` from GitHub and `flix release` publishes there. There is no local-path dependency.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `flix build` | compile |
-| `flix test` | 30 tests — the 29 that came over from the consumer, plus one that names the key-order guarantee outright |
+| `flix test` | 30 tests |
 | `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
 | `flix release` | publish a version to GitHub |
 
@@ -42,7 +38,7 @@ The tests are the first half. The second half is the consumer, and it is the onl
 
     cd <consumer>/backend
     export DATABASE_URL="jdbc:sqlite:.db/motorsport.sqlite"
-    flix test                                              # 429 pass, 0 fail — 458 less the 29 that came here
+    flix test                                              # 429 pass, 0 fail
     flix run -- --export --export-only 2025/le_mans_24h \
                --export-only 2025/cota_6h --out ../app/static/wec     # about 7.5s
 
@@ -56,10 +52,6 @@ Then all five written files must still hash to what the consumer has committed:
 | `app/static/wec/2025/cota_6h.json` | `4d03c6ef9ff75cb2dd42b78a6e3f5321` |
 | `app/static/wec/2025/cota_6h_laps.jsonl` | `f7e1b10ee573609dc06f8b7859c4a4f1` |
 
-## The rename, priced and paid
-
-The module arrived as `Util.Json.Encode`, which nests under the standard `Util.Json` and reads like part of it. The move to `OrderedJson` is done in the consumer, and it cost: `Encode.JsonValue` as a type annotation 36, one bare `JsonValue` alias in `Round/Render.flix` 6, `use` lines across 19 files, and one module move (`Util.Json.Encode.Extra` → `Util.Json.Extra`). Nothing else moved, and no output byte changed.
-
 ## Comments and committing
 
-The consumer's rules carry over. Prose breaks its lines only at sentence ends. A comment says only what the code cannot — an outside constraint, a hazard, a decision whose alternatives looked equal — and the reasoning for a change belongs in its commit message. Commit prefixes in use: `feat:` `refactor:` `chore:` `docs:` `build:` `env:` `data:` `fix:`.
+Prose breaks its lines only at sentence ends. A comment says only what the code cannot — an outside constraint, a hazard, a decision whose alternatives looked equal — and the reasoning for a change belongs in its commit message. Commit prefixes in use: `feat:` `refactor:` `chore:` `docs:` `build:` `env:` `data:` `fix:`.

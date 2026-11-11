@@ -1,7 +1,6 @@
 /// A JSON value that writes an object's properties in the order they were authored.
 ///
-/// The standard `Util.Json` holds an object as `JObject(Map[String, Json])`, documented as giving canonical
-/// sorted key order on output, and its `JArray` is a closed `Vector[Json]`, so an ordered object cannot sit inside an array either.
+/// The standard `Util.Json` sorts its keys, and its `JArray` is a closed `Vector[Json]`, so an ordered object cannot sit inside an array either.
 pub mod OrderedJson {
 
     pub enum Value {
@@ -24,7 +23,7 @@ pub mod OrderedJson {
 
     /// How far the layout breaks lines: every value on a line of its own, small objects pulled onto the line their own key stands on, or no break at all.
     pub enum Layout with Eq {
-        /// Byte-identical to `Util.Json.toPrettyString(2, ·)` apart from key order, and 2 is that module's own default.
+        /// Byte-identical to `Util.Json.toPrettyString(2, ·)` apart from key order, and from any `Float64` the standard module would widen to its exact decimal.
         case Expanded
         /// Objects the rule admits join their key's line; arrays still take one element per line.
         case Inlined(Inline)

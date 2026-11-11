@@ -50,7 +50,7 @@ pub mod OrderedJson.TestValue {
         Assert.assertTrue(String.contains({substr = "\"name\": \"test\""}, result));
         Assert.assertTrue(String.contains({substr = "\"value\": 1"}, result))
 
-    /// Written out in full, because a sorted `JObject` would put `driverName` second and no other test here says which of the two orders the library owes the caller.
+    /// A sorted `JObject` would put `driverName` second, and no other test here says which of the two orders is owed to the caller.
     @Test
     def testPropertyOrderIsTheAuthoredOrder(): Unit \ Assert =
         let lap = JsonObject(

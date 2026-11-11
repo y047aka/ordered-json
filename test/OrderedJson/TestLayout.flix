@@ -1,5 +1,4 @@
-/// The property-count limit is the caller's, not the library's, so it arrives here as an argument.
-/// `AtMost(2)` is the limit `elm-motorsport-analysis` freezes in its committed bytes.
+/// The property-count limit is the caller's, so it arrives as an argument, and `AtMost(2)` is the one the consumer's committed bytes froze.
 pub mod OrderedJson.TestLayout {
 
     use OrderedJson.render
