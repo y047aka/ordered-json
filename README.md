@@ -8,7 +8,7 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
 ## The surface a caller needs
 
-    use OrderedJson.Value.{JsonNull, JsonBool, JsonInt, JsonFloat, JsonString, JsonArray, JsonObject}
+    use OrderedJson.Json.{JsonNull, JsonBool, JsonInt, JsonFloat, JsonString, JsonArray, JsonObject}
 
     OrderedJson.toPrettyString(2, value)                        -- every value on a line of its own, as the standard module writes it
     OrderedJson.toCompactString(value)                          -- no extraneous whitespace, as the standard module writes it
@@ -22,10 +22,11 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
 | `Util.Json`                 | `OrderedJson`                     | bytes |
 | --- | --- | --- |
-| `toCompactString(j)`        | `toCompactString(v)`              | identical for a document the standard module spells the same way |
-| `toPrettyString(indent, j)` | `toPrettyString(indent, v)`       | identical, same argument order |
+| `toCompactString(j)`        | `toCompactString(j)`              | identical for a document the standard module spells the same way |
+| `toPrettyString(indent, j)` | `toPrettyString(indent, j)`       | identical, same argument order |
+| `Json`, `instance ToString` | `Json`, `instance ToString`       | the type is named `Json` here too, and `ToString` writes the compact rendering there as here |
 | `parse`, `decode`           | not here                          | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
-| `Json`, `JNull` … `JObject` | `Value`, `JsonNull` … `JsonObject` | deliberately apart: both modules are installed at once, and `JObject` naming a `Map` here as well as there is a trap |
+| `JNull` … `JObject`         | `JsonNull` … `JsonObject`         | deliberately apart: both modules are installed at once, and `JObject` naming a `Map` here as well as there is a trap |
 
 ## What the library guarantees
 
@@ -46,10 +47,10 @@ Two things the frozen bytes pinned on the library instead. A collapsed object is
 
 | `Layout`        | array             | object                                                                |
 | --------------- | ----------------- | --------------------------------------------------------------------- |
-| `Expanded`      | one line per item | one line per property                                                 |
+| `Compact`       | `[1,2]`           | `{"k":v}`, however many properties — the standard module's compact bytes |
+| `Pretty`        | one line per item | one line per property — the standard module's `Pretty`, the indent being an argument |
 | `Inlined(rule)` | one line per item | per property, unless `rule` admits the count and every value fits → one line |
 | `OneLine`       | `[1, 2]`          | `{ "k": v, … }`, however many properties                              |
-| `Compact`       | `[1,2]`           | `{"k":v}`, however many properties — the standard module's compact bytes |
 
 ## Consumed by
 

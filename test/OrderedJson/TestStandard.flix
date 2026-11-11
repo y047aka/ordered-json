@@ -4,10 +4,10 @@
 pub mod OrderedJson.TestStandard {
 
     use OrderedJson.Layout
-    use OrderedJson.Value.{JsonNull, JsonBool, JsonInt, JsonString, JsonArray, JsonObject}
+    use OrderedJson.Json.{JsonNull, JsonBool, JsonInt, JsonString, JsonArray, JsonObject}
 
     /// The same document as `standard`, authored in the order `standard` spells it in.
-    def document(): OrderedJson.Value =
+    def document(): OrderedJson.Json =
         JsonObject(
             ("a", JsonNull) ::
             ("b", JsonArray(JsonInt(1) :: JsonBool(true) :: Nil)) ::
@@ -40,6 +40,11 @@ pub mod OrderedJson.TestStandard {
     @Test
     def testRenderIsTheStandardDefaultOfTwoSpaces(): Unit \ Assert =
         Assert.assertTrue(OrderedJson.render(document()) == OrderedJson.toPrettyString(2, document()))
+
+    /// The standard module's `instance ToString[Json]` writes the compact rendering, and this one does too.
+    @Test
+    def testToStringIsTheCompactRendering(): Unit \ Assert =
+        Assert.assertTrue(ToString.toString(document()) == OrderedJson.toCompactString(document()))
 
     /// The one-line layout of this library is not the standard module's compact one: it keeps a space after every colon, and inside a collapsed object.
     @Test

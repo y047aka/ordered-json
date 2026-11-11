@@ -5,12 +5,12 @@ pub mod OrderedJson.TestLayout {
     use OrderedJson.renderWith
     use OrderedJson.Layout
     use OrderedJson.Inline
-    use OrderedJson.Value.{JsonNull, JsonInt, JsonString, JsonArray, JsonObject}
+    use OrderedJson.Json.{JsonNull, JsonInt, JsonString, JsonArray, JsonObject}
 
-    def inlined(value: OrderedJson.Value): String =
+    def inlined(value: OrderedJson.Json): String =
         renderWith(Layout.Inlined(Inline.AtMost(2)), 2, value)
 
-    def onOneLine(value: OrderedJson.Value): String =
+    def onOneLine(value: OrderedJson.Json): String =
         renderWith(Layout.OneLine, 2, value)
 
     @Test

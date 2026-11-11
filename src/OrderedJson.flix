@@ -1,543 +1,208 @@
-/*
- * Copyright 2026 Flix Authors
- *
- * Use of this source code is governed by the Apache 2.0 license
- * that can be found in the LICENSE.md file.
- */
-
 ///
 /// Type of JSON values, and its functions.
 ///
-pub mod Util.Json {
+/// The shape of this module — the two public renderers, the writer underneath them, and the names
+/// `write`, `breakIndent`, `writeColon`, `writeIndent`, `escapeString` — is `Util.Json`'s, and it was
+/// written against `Util/Json.flix` at flix/flix master. The wording is this repository's own: the
+/// standard library is Apache 2.0 and this one is MIT, so the structure could be taken and the
+/// sentences could not.
+///
+/// What differs is the key order, and the collapse. An object here is a `List` of key and value pairs
+/// and not a `Map`, so the output order is the order the properties were authored in.
+///
 
-    use Util.Json.JsonError
-    use Util.Json.JsonError.JsonError.Parse
-    use Util.Json.JsonError.ParseErrorKind.{DuplicateKey, InvalidEscape, InvalidNumber, InvalidUnicode, MaxDepthExceeded, UnexpectedChar, UnexpectedEof}
-    use Util.Json.FromJson
+pub mod OrderedJson {
 
     ///
     /// Type of JSON values.
     ///
-    /// JSON numbers are stored as `BigDecimal` for lossless round-trip;
-    /// JSON objects are stored as `Map[String, Json]`, which gives
-    /// canonical (sorted) key order on output.
+    /// JSON numbers are kept as `Int32` and `Float64`, which spells a `Float64` the way `Double.toString`
+    /// spells it rather than as the exact decimal a `BigDecimal` widens it to; JSON objects are kept as
+    /// `List[(String, Json)]`, which gives the authored key order on output.
     ///
     pub enum Json with Eq {
-        case JArray(Vector[Json])
-        case JBool(Bool)
-        case JNull
-        case JNumber(BigDecimal)
-        case JObject(Map[String, Json])
-        case JString(String)
+        case JsonArray(List[Json])
+        case JsonBool(Bool)
+        case JsonFloat(Float64)
+        case JsonInt(Int32)
+        case JsonNull
+        case JsonObject(List[(String, Json)])
+        case JsonString(String)
     }
 
     instance ToString[Json] {
         pub def toString(j: Json): String = toCompactString(j)
     }
 
-    instance Formattable[Json] {
-        pub def format(j: Json): RichString = toRichString(2, j)
+    ///
+    /// How many properties an object may have and still be written on the line its own key stands on.
+    /// An object whose values already span lines never collapses, whatever the rule says.
+    ///
+    pub enum Inline with Eq {
+        case Never
+        case AtMost(Int32)
+        case Always
     }
 
     ///
-    /// The maximum nesting depth (number of enclosing arrays/objects) the parser
-    /// accepts. Inputs nested deeper are rejected with `MaxDepthExceeded` rather
-    /// than overflowing the JVM stack, since the recursive-descent parser uses one
-    /// stack frame per level.
+    /// Controls the layout used by `write`: how far the rendering breaks lines, and how much whitespace it
+    /// keeps between the tokens.
     ///
-    def maxDepth(): Int32 = 128
-
+    /// The indentation per nesting level is not part of it. `toPrettyString` takes it as its own argument,
+    /// as the standard module does, and two of the four layouts have no indentation to take.
     ///
-    /// Parses `s` as a JSON value.
-    ///
-    /// Returns `Ok(j)` if `s` is a single well-formed JSON value (with
-    /// optional surrounding whitespace) and nothing else. Returns
-    /// `Err(JsonError)` otherwise — see `Json.JsonError` for the cases.
-    ///
-    pub def parse(s: String): Result[JsonError, Json] =
-        let n = String.length(s);
-        let i0 = skipWs(s, 0, n);
-        match parseValue(s, i0, n, 0) {
-            case Err(e) => Err(e)
-            case Ok((j, i1)) =>
-                let i2 = skipWs(s, i1, n);
-                if (i2 >= n) Ok(j)
-                else Err(Parse(i2, UnexpectedChar(String.charAt(i2, s))))
-        }
-
-    ///
-    /// Parses `s` as a JSON value and decodes it as `a` via `FromJson[a]`.
-    ///
-    /// Returns `Err(Parse(...))` if parsing fails or `Err(Decode(...))` if
-    /// decoding fails.
-    ///
-    pub def decode(s: String): Result[JsonError, a] with FromJson[a] = forM (
-        j <- parse(s);
-        x <- FromJson.fromJson(j)
-    ) yield x
-
-    ///
-    /// Controls the layout used by `write`.
-    ///
-    /// `Compact` emits no extraneous whitespace; `Pretty(indent)` places each
-    /// element on its own line using `indent` spaces per nesting level.
-    ///
-    enum Style {
+    pub enum Layout with Eq {
+        /// No extraneous whitespace, as the standard module's `Compact` writes it: `{"a":1,"b":[1,2]}`.
         case Compact
-        case Pretty(Int32)
+        /// Each element on its own line, as the standard module's `Pretty` writes it, the indent being elsewhere.
+        case Pretty
+        /// Objects the rule admits join their key's line; arrays still take one element per line.
+        case Inlined(Inline)
+        /// No line break at all, for JSON Lines output, where the line break separates records and so cannot
+        /// appear inside one. Not `Compact`: this keeps a space after every colon, and the space inside a
+        /// collapsed object.
+        case OneLine
     }
 
     ///
-    /// Returns the compact JSON rendering of `j`: a single line with
-    /// no extraneous whitespace.
+    /// Returns the compact JSON rendering of `j`: a single line with no extraneous whitespace.
     ///
-    pub def toCompactString(j: Json): String = region rc {
-        let sb = StringBuilder.empty(rc);
-        write(j, 0, Style.Compact, sb);
-        StringBuilder.toString(sb)
-    }
+    pub def toCompactString(j: Json): String =
+        renderWith(Layout.Compact, 0, j)
 
     ///
-    /// Returns the pretty-printed JSON rendering of `j`, using `indent` spaces
-    /// per nesting level.
+    /// Returns the pretty-printed JSON rendering of `j`, using `indent` spaces per nesting level.
     ///
-    /// Empty arrays and objects are rendered on a single line as `[]` or `{}`.
-    /// Non-empty containers place each element on its own line; object keys
-    /// are followed by `": "`.
+    /// Empty arrays and objects are rendered on a single line as `[]` or `{}`. Non-empty containers place
+    /// each element on its own line; object keys are followed by `": "`.
     ///
-    pub def toPrettyString(indent: Int32, j: Json): String = region rc {
-        let sb = StringBuilder.empty(rc);
-        write(j, 0, Style.Pretty(indent), sb);
-        StringBuilder.toString(sb)
-    }
+    pub def toPrettyString(indent: Int32, j: Json): String =
+        renderWith(Layout.Pretty, indent, j)
 
     ///
-    /// Returns the pretty-printed JSON rendering of `j` as a `RichString`,
-    /// with syntax-coloured tokens.
+    /// The pretty rendering at the standard module's own default of two spaces per nesting level.
     ///
-    /// The layout is identical to `toPrettyString`. Colours: `null` is gray,
-    /// booleans are magenta, numbers are yellow, string values are green,
-    /// and object keys are cyan. Punctuation and whitespace use the default
-    /// colour.
-    ///
-    pub def toRichString(indent: Int32, j: Json): RichString =
-        richPretty(indent, 0, j)
+    pub def render(j: Json): String =
+        toPrettyString(2, j)
 
     ///
-    /// Appends the JSON rendering of `j` to `sb` using style `s`.
+    /// Returns the JSON rendering of `j` under `layout`, indented `indent` spaces per nesting level.
     ///
-    /// `d` is the current nesting level (0 at the root); it is ignored in
-    /// `Compact` style. Empty arrays and objects always render as `[]` or `{}`.
+    /// `Layout.Compact` and `Layout.OneLine` ignore `indent`: neither breaks a line.
     ///
-    def write(j: Json, d: Int32, s: Style, sb: StringBuilder[r]): Unit \ r = match j {
-        case JArray(v) =>
-            if (Vector.isEmpty(v))
-                StringBuilder.appendString("[]", sb)
-            else {
-                StringBuilder.append('[', sb);
-                foreach ((i, e) <- ForEach.withIndex(v)) {
-                    if (i > 0) { StringBuilder.append(',', sb) };
-                    breakIndent(d + 1, s, sb);
-                    write(e, d + 1, s, sb)
-                };
-                breakIndent(d, s, sb);
-                StringBuilder.append(']', sb)
-            }
-        case JBool(b) =>
-            StringBuilder.appendString(if (b) "true" else "false", sb)
-        case JNull =>
-            StringBuilder.appendString("null", sb)
-        case JNumber(n) =>
-            StringBuilder.appendString(BigDecimal.toPlainString(n), sb)
-        case JObject(m) =>
-            if (Map.isEmpty(m))
-                StringBuilder.appendString("{}", sb)
-            else {
-                StringBuilder.append('{', sb);
-                foreach ((i, (k, x)) <- ForEach.withIndex(m)) {
-                    if (i > 0) { StringBuilder.append(',', sb) };
-                    breakIndent(d + 1, s, sb);
-                    writeEscaped(k, sb);
-                    writeColon(s, sb);
-                    write(x, d + 1, s, sb)
-                };
-                breakIndent(d, s, sb);
-                StringBuilder.append('}', sb)
-            }
-        case JString(str) =>
-            writeEscaped(str, sb)
-    }
+    pub def renderWith(layout: Layout, indent: Int32, j: Json): String =
+        write(j, 0, layout, indent)
 
     ///
-    /// In `Pretty` style, appends a newline followed by the indentation for
-    /// nesting level `d`. In `Compact` style, does nothing.
+    /// Returns the JSON rendering of `j` under `layout`.
     ///
-    def breakIndent(d: Int32, s: Style, sb: StringBuilder[r]): Unit \ r = match s {
-        case Style.Compact     => ()
-        case Style.Pretty(ind) => StringBuilder.append('\n', sb); writeIndent(ind * d, sb)
-    }
+    /// `d` is the current nesting level (0 at the root); it is ignored by the layouts that break no line.
+    /// Empty arrays and objects always render as `[]` or `{}`.
+    ///
+    def write(j: Json, d: Int32, layout: Layout, indent: Int32): String =
+        match j {
+            case Json.JsonNull       => "null"
+            case Json.JsonBool(b)    => if (b) "true" else "false"
+            case Json.JsonInt(n)     => "${n}"
+            case Json.JsonFloat(n)   => "${n}"
+            case Json.JsonString(s)  => escapeString(s)
+            case Json.JsonArray(xs)  =>
+                array(layout, indent, d, xs |> List.map(x -> write(x, d + 1, layout, indent)))
+            case Json.JsonObject(kvs) =>
+                let sep = writeColon(layout);
+                let entries = kvs |> List.map(match (k, v) ->
+                    "${escapeString(k)}${sep}${write(v, d + 1, layout, indent)}"
+                );
+                object(layout, indent, d, entries)
+        }
 
     ///
-    /// Appends the object key/value separator to `sb`: `":"` in `Compact`
-    /// style and `": "` in `Pretty` style.
+    /// The rendering of an array whose elements are rendered already: `items` holds one rendered element per
+    /// element of the array.
     ///
-    def writeColon(s: Style, sb: StringBuilder[r]): Unit \ r = match s {
-        case Style.Compact   => StringBuilder.append(':', sb)
-        case Style.Pretty(_) => StringBuilder.appendString(": ", sb)
-    }
+    def array(layout: Layout, indent: Int32, d: Int32, items: List[String]): String =
+        if (List.isEmpty(items))
+            "[]"
+        else if (layout == Layout.Compact)
+            "[${List.join(",", items)}]"
+        else if (layout == Layout.OneLine)
+            "[${List.join(", ", items)}]"
+        else
+            onOwnLines(indent, d, "[", items, "]")
 
     ///
-    /// Appends `n` spaces to `sb`. Does nothing if `n <= 0`.
+    /// The rendering of an object whose entries are rendered already.
     ///
-    def writeIndent(n: Int32, sb: StringBuilder[r]): Unit \ r =
-        if (n > 0) { StringBuilder.appendString(String.repeat(n, " "), sb) }
+    /// The space inside the braces of a collapsed object is a frozen byte: the consumer's committed archive
+    /// carries it, and `Layout.OneLine` would restamp 24,146 lap lines without it.
+    ///
+    def object(layout: Layout, indent: Int32, d: Int32, entries: List[String]): String =
+        if (List.isEmpty(entries))
+            "{}"
+        else if (layout == Layout.Compact)
+            "{${List.join(",", entries)}}"
+        else if (collapses(layout, entries))
+            "{ ${List.join(", ", entries)} }"
+        else
+            onOwnLines(indent, d, "{", entries, "}")
 
     ///
-    /// Returns the pretty-printed JSON rendering of `j` as a coloured
-    /// `RichString`.
+    /// Whether an object whose entries are these goes on the line its key stands on: the rule admits the count,
+    /// and no entry spans lines.
     ///
-    /// `indent` is the number of spaces per nesting level; `depth` is the
-    /// current nesting level (0 at the root).
-    ///
-    def richPretty(indent: Int32, depth: Int32, j: Json): RichString = match j {
-        case JArray(v) if Vector.isEmpty(v) =>
-            RichString.fromString("[]")
-        case JArray(v) =>
-            let nl = RichString.fromString("\n");
-            let inner = richIndent(indent * (depth + 1));
-            let outer = richIndent(indent * depth);
-            let elements = Vector.map(e -> richPretty(indent, depth + 1, e), v);
-            let sep = RichString.fromString(",") + nl + inner;
-            RichString.fromString("[") + nl + inner +
-                RichString.join(sep, elements) + nl + outer + RichString.fromString("]")
-        case JBool(b) =>
-            RichString.magenta(if (b) "true" else "false")
-        case JNull =>
-            RichString.gray("null")
-        case JNumber(n) =>
-            RichString.yellow(BigDecimal.toPlainString(n))
-        case JObject(m) if Map.isEmpty(m) =>
-            RichString.fromString("{}")
-        case JObject(m) =>
-            let nl = RichString.fromString("\n");
-            let colon = RichString.fromString(": ");
-            let inner = richIndent(indent * (depth + 1));
-            let outer = richIndent(indent * depth);
-            let entries = Map.toList(m) |> List.map(match (k, x) ->
-                RichString.cyan(escapeString(k)) + colon + richPretty(indent, depth + 1, x));
-            let sep = RichString.fromString(",") + nl + inner;
-            RichString.fromString("{") + nl + inner +
-                RichString.join(sep, entries) + nl + outer + RichString.fromString("}")
-        case JString(s) =>
-            RichString.green(escapeString(s))
-    }
-
-    ///
-    /// Returns a `RichString` of `n` plain spaces. Returns the empty `RichString`
-    /// if `n <= 0`.
-    ///
-    def richIndent(n: Int32): RichString =
-        if (n > 0) RichString.fromString(String.repeat(n, " ")) else RichString.empty()
-
-    ///
-    /// Returns `s` as a JSON string literal: enclosed in double quotes, with
-    /// backslash, double-quote, and control characters escaped per RFC 8259.
-    ///
-    def escapeString(s: String): String = region rc {
-        let sb = StringBuilder.empty(rc);
-        writeEscaped(s, sb);
-        StringBuilder.toString(sb)
-    }
-
-    ///
-    /// Appends `s` to `sb` as a JSON string literal: enclosed in double quotes,
-    /// with backslash, double-quote, and control characters escaped per RFC 8259.
-    ///
-    def writeEscaped(s: String, sb: StringBuilder[r]): Unit \ r =
-        StringBuilder.append('"', sb);
-        foreach (c <- String.toList(s)) {
-            writeEscapedChar(c, sb)
+    def collapses(layout: Layout, entries: List[String]): Bool =
+        let rule = match layout {
+            case Layout.Compact     => Inline.Never
+            case Layout.Pretty      => Inline.Never
+            case Layout.OneLine     => Inline.Always
+            case Layout.Inlined(r)  => r
         };
-        StringBuilder.append('"', sb)
-
-    ///
-    /// Appends `c` to `sb`, JSON-escaped if necessary.
-    ///
-    /// The two-character short escapes are emitted for backslash (0x5C),
-    /// double-quote (0x22), backspace (0x08), tab (0x09), newline (0x0A),
-    /// form-feed (0x0C), and carriage-return (0x0D). Other characters with
-    /// code point below 0x20 are emitted as `\u00XX`. Everything else is
-    /// passed through unchanged.
-    ///
-    def writeEscapedChar(c: Char, sb: StringBuilder[r]): Unit \ r =
-        let cp = Char.toBmpCodePoint(c);
-        match cp {
-            case 0x5C => StringBuilder.appendString("\\\\", sb)
-            case 0x22 => StringBuilder.appendString("\\\"", sb)
-            case 0x08 => StringBuilder.appendString("\\b", sb)
-            case 0x09 => StringBuilder.appendString("\\t", sb)
-            case 0x0A => StringBuilder.appendString("\\n", sb)
-            case 0x0C => StringBuilder.appendString("\\f", sb)
-            case 0x0D => StringBuilder.appendString("\\r", sb)
-            case _ if cp < 0x20 => writeControlEscape(cp, sb)
-            case _ => StringBuilder.append(c, sb)
+        let fits = List.forAll(fitsOnOneLine, entries);
+        match rule {
+            case Inline.Never     => false
+            case Inline.Always    => fits
+            case Inline.AtMost(n) => List.length(entries) <= n and fits
         }
 
     ///
-    /// Appends the JSON `\u00XX` escape for the given code point `cp`.
+    /// A newline followed by the indentation for nesting level `d`: where the line breaks, and how far in.
     ///
-    /// Precondition: `0 <= cp < 0x20`.
-    ///
-    def writeControlEscape(cp: Int32, sb: StringBuilder[r]): Unit \ r =
-        StringBuilder.appendString("\\u00", sb);
-        StringBuilder.append(hexDigit(cp / 16), sb);
-        StringBuilder.append(hexDigit(Int32.bitwiseAnd(cp, 15)), sb)
+    def breakIndent(indent: Int32, d: Int32): String =
+        "\n${writeIndent(indent * d)}"
 
     ///
-    /// Returns the lowercase hex digit for `n`.
+    /// `n` spaces. The empty string if `n <= 0`.
     ///
-    /// Precondition: `0 <= n < 16`. Otherwise unreachable from the call site
-    /// in `writeControlEscape`.
-    ///
-    def hexDigit(n: Int32): Char =
-        match Char.forDigit(radix = 16, n) {
-            case Some(c) => c
-            case None    => unreachable!()
-        }
+    def writeIndent(n: Int32): String =
+        if (n > 0) String.repeat(n, " ") else ""
 
     ///
-    /// Returns the position of the first non-whitespace character at or after `i`.
+    /// The object key/value separator: `":"` in `Compact`, `": "` in the styles that keep a space there.
     ///
-    /// JSON whitespace per RFC 8259 is space, tab, line feed, and carriage return.
-    ///
-    def skipWs(s: String, i: Int32, n: Int32): Int32 =
-        if (i >= n) i
-        else {
-            let c = String.charAt(i, s);
-            if (c == ' ' or c == '\t' or c == '\n' or c == '\r') skipWs(s, i + 1, n)
-            else i
-        }
+    def writeColon(layout: Layout): String =
+        if (layout == Layout.Compact) ":" else ": "
 
     ///
-    /// Parses a single JSON value at position `i` (skipping leading whitespace).
+    /// The rendering of a container that breaks its lines: `open`, one item per line at nesting level `d + 1`,
+    /// and `close` back at `d`.
     ///
-    /// `depth` is the number of arrays/objects already open around this value.
-    ///
-    def parseValue(s: String, i: Int32, n: Int32, depth: Int32): Result[JsonError, (Json, Int32)] =
-        let j = skipWs(s, i, n);
-        if (j >= n) Err(Parse(j, UnexpectedEof))
-        else {
-            let c = String.charAt(j, s);
-            match c {
-                case '{' if depth >= maxDepth() => Err(Parse(j, MaxDepthExceeded))
-                case '[' if depth >= maxDepth() => Err(Parse(j, MaxDepthExceeded))
-                case '{' => parseObject(s, j, n, depth)
-                case '[' => parseArray(s, j, n, depth)
-                case 't' => parseLiteral(s, j, n, "true", JBool(true))
-                case 'f' => parseLiteral(s, j, n, "false", JBool(false))
-                case 'n' => parseLiteral(s, j, n, "null", JNull)
-                case _ if Char.toBmpCodePoint(c) == 0x22 =>
-                    Result.map(match (str, k) -> (JString(str), k), parseString(s, j, n))
-                case _ if Char.isDigit(c) or c == '-' => parseNumber(s, j, n)
-                case _ => Err(Parse(j, UnexpectedChar(c)))
-            }
-        }
+    def onOwnLines(indent: Int32, d: Int32, open: String, items: List[String], close: String): String =
+        let at = breakIndent(indent, d + 1);
+        "${open}${at}${List.join(",${at}", items)}${breakIndent(indent, d)}${close}"
 
     ///
-    /// Matches the literal `lit` at position `i` and returns `(v, i + length(lit))`.
+    /// Whether a rendered value can be reached without crossing a line break.
     ///
-    def parseLiteral(s: String, i: Int32, n: Int32, lit: String, v: Json): Result[JsonError, (Json, Int32)] =
-        let m = String.length(lit);
-        if (matchAt(s, i, n, lit, m, 0)) Ok((v, i + m))
-        else if (i >= n) Err(Parse(i, UnexpectedEof))
-        else Err(Parse(i, UnexpectedChar(String.charAt(i, s))))
+    def fitsOnOneLine(rendered: String): Bool =
+        not String.contains({substr = "\n"}, rendered)
 
     ///
-    /// Returns `true` if `s[i..i+m]` equals `lit`. Returns `false` if it differs
-    /// or if there are fewer than `m` characters left in `s`.
+    /// The JSON rendering of a string: quoted, with every character below 0x20 escaped.
     ///
-    def matchAt(s: String, i: Int32, n: Int32, lit: String, m: Int32, j: Int32): Bool =
-        if (j >= m) true
-        else if (i + j >= n) false
-        else if (String.charAt(i + j, s) != String.charAt(j, lit)) false
-        else matchAt(s, i, n, lit, m, j + 1)
-
+    /// The standard module's own `escapeString` is not `pub`, and this is its public route — the one thing
+    /// here that the standard module is still asked to do.
     ///
-    /// Parses a JSON number starting at `i`. Defers to `BigDecimal.fromString`
-    /// for the actual parse; this just identifies the run of number characters.
-    ///
-    def parseNumber(s: String, i: Int32, n: Int32): Result[JsonError, (Json, Int32)] =
-        let end = scanNumberEnd(s, i, n);
-        let str = String.slice(start = i, end = end, s);
-        match BigDecimal.fromString(str) {
-            case Some(bd) => Ok((JNumber(bd), end))
-            case None     => Err(Parse(i, InvalidNumber(str)))
-        }
-
-    ///
-    /// Returns the position after the last character that could be part of a JSON
-    /// number starting at `i`.
-    ///
-    def scanNumberEnd(s: String, i: Int32, n: Int32): Int32 =
-        if (i >= n) i
-        else {
-            let c = String.charAt(i, s);
-            if (Char.isDigit(c) or c == '-' or c == '+' or c == '.' or c == 'e' or c == 'E')
-                scanNumberEnd(s, i + 1, n)
-            else i
-        }
-
-    ///
-    /// Parses a JSON string literal starting at position `i` (which must point
-    /// at the opening double quote).
-    ///
-    def parseString(s: String, i: Int32, n: Int32): Result[JsonError, (String, Int32)] = region rc {
-        if (i >= n) Err(Parse(i, UnexpectedEof))
-        else if (Char.toBmpCodePoint(String.charAt(i, s)) != 0x22)
-            Err(Parse(i, UnexpectedChar(String.charAt(i, s))))
-        else {
-            let sb = StringBuilder.empty(rc);
-            scanString(s, i + 1, n, sb)
-        }
-    }
-
-    ///
-    /// Scans the body of a JSON string starting at `i` (just past the opening `"`),
-    /// appending decoded characters to `sb`. Returns the decoded string and the
-    /// position just past the closing `"`.
-    ///
-    def scanString(s: String, i: Int32, n: Int32, sb: StringBuilder[r]): Result[JsonError, (String, Int32)] \ r =
-        if (i >= n) Err(Parse(i, UnexpectedEof))
-        else {
-            let c = String.charAt(i, s);
-            let cp = Char.toBmpCodePoint(c);
-            match cp {
-                case 0x22 => Ok((StringBuilder.toString(sb), i + 1))
-                case 0x5C => scanEscape(s, i + 1, n, sb)
-                case _ =>
-                    StringBuilder.append(c, sb);
-                    scanString(s, i + 1, n, sb)
-            }
-        }
-
-    ///
-    /// Decodes a JSON string escape starting at `i` (just past the backslash).
-    ///
-    def scanEscape(s: String, i: Int32, n: Int32, sb: StringBuilder[r]): Result[JsonError, (String, Int32)] \ r =
-        if (i >= n) Err(Parse(i, UnexpectedEof))
-        else {
-            let c = String.charAt(i, s);
-            let cp = Char.toBmpCodePoint(c);
-            match cp {
-                case 0x22 => StringBuilder.appendCodePoint(0x22, sb); scanString(s, i + 1, n, sb)
-                case 0x5C => StringBuilder.appendCodePoint(0x5C, sb); scanString(s, i + 1, n, sb)
-                case 0x2F => StringBuilder.appendCodePoint(0x2F, sb); scanString(s, i + 1, n, sb)
-                case 0x62 => StringBuilder.appendCodePoint(0x08, sb); scanString(s, i + 1, n, sb)
-                case 0x66 => StringBuilder.appendCodePoint(0x0C, sb); scanString(s, i + 1, n, sb)
-                case 0x6E => StringBuilder.appendCodePoint(0x0A, sb); scanString(s, i + 1, n, sb)
-                case 0x72 => StringBuilder.appendCodePoint(0x0D, sb); scanString(s, i + 1, n, sb)
-                case 0x74 => StringBuilder.appendCodePoint(0x09, sb); scanString(s, i + 1, n, sb)
-                case 0x75 => parseUnicode(s, i + 1, n, sb)
-                case _    => Err(Parse(i, InvalidEscape(Char.toString(c))))
-            }
-        }
-
-    ///
-    /// Decodes a `\uXXXX` escape starting at `i` (just past the `u`).
-    ///
-    def parseUnicode(s: String, i: Int32, n: Int32, sb: StringBuilder[r]): Result[JsonError, (String, Int32)] \ r =
-        if (i + 4 > n) Err(Parse(i, UnexpectedEof))
-        else {
-            let hex = String.slice(start = i, end = i + 4, s);
-            // A `\uXXXX` escape must be exactly four hex digits. We must reject any other
-            // slice up front: `Int32.parse` accepts a leading sign and surrounding whitespace,
-            // so e.g. `\u-100` would otherwise parse to a negative value and crash
-            // `StringBuilder.appendCodePoint`. Four hex digits are always in 0..0xFFFF.
-            if (not String.forAll(Char.isHexDigit, hex))
-                Err(Parse(i, InvalidUnicode(hex)))
-            else match Int32.parse(16, hex) {
-                case Ok(cp) =>
-                    StringBuilder.appendCodePoint(cp, sb);
-                    scanString(s, i + 4, n, sb)
-                case Err(_) =>
-                    Err(Parse(i, InvalidUnicode(hex)))
-            }
-        }
-
-    ///
-    /// Parses a JSON array starting at `i` (which must point at the opening `[`).
-    ///
-    def parseArray(s: String, i: Int32, n: Int32, depth: Int32): Result[JsonError, (Json, Int32)] = region rc {
-        let i1 = i + 1;
-        let i2 = skipWs(s, i1, n);
-        if (i2 >= n) Err(Parse(i2, UnexpectedEof))
-        else if (String.charAt(i2, s) == ']') Ok((JArray(Vector#{}), i2 + 1))
-        else {
-            let items = MutList.empty(rc);
-            scanArrayElements(s, i2, n, items, depth + 1)
-        }
-    }
-
-    ///
-    /// Scans a comma-separated list of array elements starting at `i`.
-    ///
-    /// `depth` is the nesting depth of the elements (one deeper than the array itself).
-    ///
-    def scanArrayElements(s: String, i: Int32, n: Int32, items: MutList[Json, r], depth: Int32): Result[JsonError, (Json, Int32)] \ r =
-        match parseValue(s, i, n, depth) {
-            case Err(e) => Err(e)
-            case Ok((v, i1)) =>
-                MutList.push(v, items);
-                let i2 = skipWs(s, i1, n);
-                if (i2 >= n) Err(Parse(i2, UnexpectedEof))
-                else {
-                    let c = String.charAt(i2, s);
-                    if (c == ',') scanArrayElements(s, skipWs(s, i2 + 1, n), n, items, depth)
-                    else if (c == ']') Ok((JArray(MutList.toVector(items)), i2 + 1))
-                    else Err(Parse(i2, UnexpectedChar(c)))
-                }
-        }
-
-    ///
-    /// Parses a JSON object starting at `i` (which must point at the opening `{`).
-    ///
-    /// Rejects duplicate keys with `DuplicateKey(k)`.
-    ///
-    def parseObject(s: String, i: Int32, n: Int32, depth: Int32): Result[JsonError, (Json, Int32)] =
-        let i1 = i + 1;
-        let i2 = skipWs(s, i1, n);
-        if (i2 >= n) Err(Parse(i2, UnexpectedEof))
-        else if (String.charAt(i2, s) == '}') Ok((JObject(Map#{}), i2 + 1))
-        else scanObjectEntries(s, i2, n, Map#{}, depth + 1)
-
-    ///
-    /// Scans a comma-separated list of `"key": value` entries starting at `i`.
-    ///
-    /// `depth` is the nesting depth of the values (one deeper than the object itself).
-    ///
-    def scanObjectEntries(s: String, i: Int32, n: Int32, m: Map[String, Json], depth: Int32): Result[JsonError, (Json, Int32)] =
-        match parseString(s, i, n) {
-            case Err(e) => Err(e)
-            case Ok((k, i1)) =>
-                if (Map.memberOf(k, m)) Err(Parse(i, DuplicateKey(k)))
-                else {
-                    let i2 = skipWs(s, i1, n);
-                    if (i2 >= n) Err(Parse(i2, UnexpectedEof))
-                    else if (String.charAt(i2, s) != ':') Err(Parse(i2, UnexpectedChar(String.charAt(i2, s))))
-                    else match parseValue(s, i2 + 1, n, depth) {
-                        case Err(e) => Err(e)
-                        case Ok((v, i3)) =>
-                            let m1 = Map.insert(k, v, m);
-                            let i4 = skipWs(s, i3, n);
-                            if (i4 >= n) Err(Parse(i4, UnexpectedEof))
-                            else {
-                                let c = String.charAt(i4, s);
-                                if (c == ',') scanObjectEntries(s, skipWs(s, i4 + 1, n), n, m1, depth)
-                                else if (c == '}') Ok((JObject(m1), i4 + 1))
-                                else Err(Parse(i4, UnexpectedChar(c)))
-                            }
-                    }
-                }
-        }
+    def escapeString(s: String): String =
+        Util.Json.toCompactString(Util.Json.Json.JString(s))
 
 }
