@@ -19,8 +19,7 @@ pub mod OrderedJson {
     /// Type of JSON values.
     ///
     /// JSON numbers are stored as `Int32` and `Float64`, which spells a
-    /// `Float64` the way `Double.toString` spells it and not as the exact
-    /// decimal a `BigDecimal` widens it to;
+    /// `Float64` the way `Double.toString` spells it;
     /// JSON objects are stored as `List[(String, Json)]`, which gives
     /// the authored key order on output.
     ///

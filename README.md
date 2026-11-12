@@ -25,7 +25,7 @@ The module is `Util/Json.flix` cut down to its encoder and re-shaped around an o
 | `toPrettyString(indent, j)` | `toPrettyString(indent, j)`       | identical, same argument order |
 | `Json`, `instance ToString` | `Json`, `instance ToString`       | the type is named `Json` here too, and `ToString` writes the compact rendering there as here |
 | `JNull`, `JBool`, `JArray`, `JString` | the same  | the cases are the standard's, and `JArray` is a `Vector` here as there |
-| `JNumber(BigDecimal)`       | `JInt(Int32)`, `JFloat(Float64)`  | apart on purpose: a `Float64` through `BigDecimal` spells 17 significant digits as 55 |
+| `JNumber(BigDecimal)`       | `JInt(Int32)`, `JFloat(Float64)`  | apart on purpose: Flix's only `Float64` → `BigDecimal` conversion, `new BigDecimal(x)`, spells 17 significant digits as 55 |
 | `JObject(Map[String, Json])`| `JObject(List[(String, Json)])`   | the library |
 | `Style`                     | `Style`                           | `Compact` and `Pretty(indent)` are the standard's; `Inlined(rule, indent)` and `OneLine` are added |
 | `parse`, `decode`           | not here                          | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
@@ -35,7 +35,8 @@ The module is `Util/Json.flix` cut down to its encoder and re-shaped around an o
 
 - Pure: no effect annotation, and no dependency.
 - A string is quoted and escaped per RFC 8259, by the standard module's own `writeEscapedChar`, so every character below 0x20 reaches the output escaped.
-- Numbers keep the Flix spelling: `JInt(42)` writes `42` and `JFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than becoming the 55-digit `BigDecimal` expansion the standard module writes.
+- Numbers keep the Flix spelling: `JInt(42)` writes `42` and `JFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than the 55-digit decimal `Float64.tryToBigDecimal` writes into a `BigDecimal`.
+- `NaN` and `Infinity` are not guarded. `Float64` can hold both and `Double.toString` spells them, so `JFloat(Float64.nan())` writes `NaN`, which is not JSON; the standard module's `BigDecimal` cannot express either. Magnitudes at or beyond `1e21`, or below `1e-6`, come out with an exponent (`1.0E21`, `1.0E-7`) — valid JSON, and bytes the standard module would never write.
 - The two standard-named renderings are compared against the standard module's own output in `TestStandard`, for a document whose keys happen to be in the order a `Map` would sort them. No claim of byte-identity survives a `Float64`.
 
 ## What is not the library's business
