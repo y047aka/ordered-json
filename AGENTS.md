@@ -1,33 +1,31 @@
 # AGENTS.md
 
-The JSON value that keeps an object's properties in the order they were authored, and the layouts it renders them in. Extracted from `elm-motorsport-analysis`, which writes its timing archive with it.
+The JSON value that keeps an object's properties in the order they were authored, and the layouts it renders them in. Extracted from `elm-motorsport-analysis`, which does not reference it yet — the verification below is the check it must pass when it does.
 
 ## Where the boundary is
 
-- The library owns `OrderedJson.Json`, the traversal, the escaping, the number spelling, `Layout`, `Inline`, and the `{ ... }` padding a collapsed object gets.
-- The consumer owns which layout its files use with which `Inline` rule — `Layout.Inlined(Inline.AtMost(2))` — and the fact that it appends a key (`index`, `position`) to a value another module wrote. Its `Extra` module does not come here; it only picks a layout now, which is what makes it the consumer's and not ours.
-- Where the standard module already named a function, its name and argument order are reused: `toPrettyString(indent, j)` and `toCompactString(j)`. The type and case names are not, because both modules are installed at once and `JObject` naming a `Map` there and a `List` here is a trap.
-- Naming is decided: repo `ordered-json`, module `OrderedJson`, value type `OrderedJson.Json` (the standard's own type name, so the prefix swap is one word). The case names stay `JsonNull` … `JsonObject`. Shortening them invites a case named `String` beside the type `String`, and matching the standard `JNull` … `JObject` would name two different things alike — the standard `JObject` holds a `Map`. Rename the path, not the cases. `Layout` stays `Layout`, since it says what the cases are; its `Compact` and `Pretty` are the standard's words.
-- Where the standard module already named a function, its name and argument order are reused: `toPrettyString(indent, j)` and `toCompactString(j)`. The case names are not, because both modules are installed at once and `JObject` naming a `Map` there and a `List` here is a trap.
-- The inline rule governs objects and not arrays, which is a frozen byte-level fact and not an oversight.
+- The library owns `OrderedJson.Json`, the traversal, the escaping, the number spelling, `Style`, `Inline`, and the `{ ... }` padding a collapsed object gets.
+- The consumer owns which layout its files use with which `Inline` rule — `Style.Inlined(Inline.AtMost(2), 2)` — and the fact that it appends a key (`index`, `position`) to a value another module wrote. Its `Extra` module does not come here; it only picks a layout now, which is what makes it the consumer's and not ours.
+- Where the standard module already named a function, a type, or a case, its name and argument order are reused. README's table is the inventory.
+- Naming is decided: repo `ordered-json`, module `OrderedJson`, value type `OrderedJson.Json`, and the standard module's own case names. `JObject` naming a `Map` there and a `List` here is the trap to watch; the prefix is what keeps the two types apart at a call site.
 
 ## Facts about the standard library already paid for; do not re-derive them
 
 - `Util.Json.Json.JObject` is `Map[String, Json]`, documented as canonical sorted key order. That is the reason this module exists.
-- `Util.Json.Json.JArray` is `Vector[Json]` and closed, so it cannot hold an ordered object. The recursive type therefore stays here.
-- `Util.Json.Json.JNumber` is `BigDecimal`. A `Float64` enters it through `new BigDecimal(x)`, so `0.20739060549440685` becomes `0.207390605494406854436562070986838079988956451416015625`, and `Int32` and `Float64` become the same case. Numbers stay home-grown.
-- The standard module's `escapeString` is not `pub`; `Util.Json.toCompactString(JString(s))` is its public route, and is the one thing here the standard module is still asked to do.
-- The repository is Apache 2.0, the same license as the Flix standard library, which is why the module's structure, its names, and the docstrings that still describe it are `Util/Json.flix`'s own rather than paraphrases of them. `LICENSE.md` is the file name the standard library's own header points to. The one consequence to remember: the license is no longer a reason to reword anything, so a docstring that drifts from the standard's is a decision, not a constraint.
+- `Util.Json.Json.JArray` is `Vector[Json]` and closed, so it cannot hold an ordered object. The recursive type therefore stays here. This module's `JArray` is a `Vector` too, which is why the standard library's own tests cross the prefix swap unchanged.
+- `Util.Json.Json.JNumber` is `BigDecimal`, documented as "lossless round-trip", and it is this module's number. `Eq[BigDecimal]` is numeric, so `JNumber(1) == JNumber(1.0)` is `true` while the two still spell differently, and `BigDecimal.fromString("1.50")` renders `1.50`. Getting a `Float64` into one is the caller's business and the one trap here; the section of that name in README owns the two routes, and there is no helper here.
+- The escaping and the number are the standard module's own, unchanged: `writeEscaped`, `writeEscapedChar`, `writeControlEscape`, `hexDigit`, and `BigDecimal.toPlainString(n)`.
+- The repository is Apache 2.0, the same license as the Flix standard library, which is why the module's structure, its names, and the docstrings that still describe it are `Util/Json.flix`'s own. The standard library's header points at a `LICENSE.md`; this repository's file is `LICENSE`. The one consequence to remember: the license is no longer a reason to reword anything, so a docstring that drifts from the standard's is a decision, not a constraint.
 - `Util.Json` has `instance ToString[Json] = toCompactString` and `instance Formattable[Json] = toRichString(2, ·)`. The `ToString` one is here; `Formattable` needs `RichString` and the colours, and is not.
-- `Util.Json.toPrettyString(2, j)` gives 2-space indent, `": "` after the key, `{}` and `[]` when empty, one element per line — the same bytes as `Layout.Pretty` at indent 2 apart from key order, and from any `Float64` it widens to its exact decimal. No claim of byte-identity with the standard module survives a `Float64`. The comparison is a test now (`TestStandard`), on a document whose keys happen to be in the order a `Map` would sort them.
-- The standard module spells a number `BigDecimal.toPlainString(n)` where this one writes `"${n}"`. Both give `1` for a parsed `1`; they part company at any `Float64`.
-- The standard module's own layout type, `Style` (`Compact` / `Pretty(Int32)`), is not `pub`, so there is no public layout to align to. What is public and shared is the `indent` argument, which is why `Layout` carries no indent and `toPrettyString(indent, j)` does. Two of the four layouts here — `Compact` and `OneLine` — have no indentation to carry.
-- `Util.Json.parse` puts an object into a `Map`, so an order-preserving `parse` cannot be built on it — the order is gone before any encoder is asked for it. `parse`, `decode`, and `FromJson` are therefore not on the compatibility list, and neither is `toRichString`.
-- `Util.Json` has `instance ToString[Json] = toCompactString` and `instance Formattable[Json] = toRichString(2, ·)`. The aligned `instance ToString[Value]` is the next step and was left undone because no caller reached it.
+- `Util.Json.toPrettyString(2, j)` gives 2-space indent, `": "` after the key, `{}` and `[]` when empty, one element per line — the same bytes as `Style.Pretty` at indent 2 apart from key order. `TestStandard` compares them.
+- The standard module's own layout type, `Style` (`Compact` / `Pretty(Int32)`), is not `pub`, so it is copied here rather than reused. Its `Pretty(Int32)` shape is kept, which is what puts the indent in the style rather than beside it.
+- A pure `let` in Flix is call-by-need: binding a computation above the branch that may discard it costs nothing, and only effects are ordered. `and`, `or`, and the branches of an `if` do short-circuit. Hoisting a walk out of a `match` is therefore not a performance bug.
+- Flix brings an enum's tags into the enclosing scope only where the enum is its module's namesake. `Util.Json` declares `Json` and so writes `case JArray(v)` bare; `OrderedJson` declares `Json` but is not called `Json`, so the module opens with `use OrderedJson.Json.{JArray, …}`.
+- `Util.Json.parse` puts an object into a `Map`, so an order-preserving `parse` cannot be built on it — the order is gone before any encoder is asked for it. It refuses a duplicate key with `DuplicateKey`, and accepts a raw control character inside a string, so it is a fence on key order and not on escaping.
+- The standard library's own `TestJson.flix` is vendored at `test/OrderedJson/TestJson.flix`, reduced to the 50 encoder tests, and passes unchanged but for `Map#{…}` becoming a `List`.
 - `Util.Json` is the standard library's own module: a project may nest under it, which is why the module could live at `Util.Json.Encode`, but Flix 0.79 refuses a second declaration of it.
-- `Util.Json.parse` refuses a duplicate key with `DuplicateKey`, and accepts a raw control character inside a string. It is therefore a fence on key order and not on escaping.
-- `Eq[BigDecimal]` is `compareTo == 0`, scale-insensitive, so `render → parse → == the expected Json` is sound for floats.
-- Flix string literals have no `\b`, `\f` or `\uXXXX`. Char literals do, and `Char.toString('\u0008')` is how a test builds one.
+- A Flix file must be named for the module it declares: `pub mod OrderedJson.JsonPath` lives at `src/OrderedJson/JsonPath.flix`, and a child module cannot be declared until its parent is. Flix reports both as `Mismatched module and file` and `Orphaned module`, and the errors cascade into hundreds.
+- Flix string literals have no `\b` or `\f`, but `\uXXXX` works, so a control character is written `"\u0008"` and not built with `Char.toString`. Char literals take both.
 - `flix install` resolves `owner/name[@ver]` from GitHub and `flix release` publishes there. There is no local-path dependency.
 
 ## Commands
@@ -35,7 +33,7 @@ The JSON value that keeps an object's properties in the order they were authored
 | Command | Purpose |
 | --- | --- |
 | `flix build` | compile |
-| `flix test` | 36 tests |
+| `flix test` | 69 tests |
 | `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
 | `flix release` | publish a version to GitHub |
 
@@ -47,9 +45,9 @@ The tests are the first half. The second half is the consumer, and it is the onl
 
     cd <consumer>/backend
     export DATABASE_URL="jdbc:sqlite:.db/motorsport.sqlite"
-    flix test                                              # 429 pass, 0 fail
+    flix test
     flix run -- --export --export-only 2025/le_mans_24h \
-               --export-only 2025/cota_6h --out ../app/static/wec     # about 7.5s
+               --export-only 2025/cota_6h --out ../app/static/wec
 
 Then all five written files must still hash to what the consumer has committed:
 

@@ -8,54 +8,58 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
 ## The surface a caller needs
 
-    use OrderedJson.Json.{JsonNull, JsonBool, JsonInt, JsonFloat, JsonString, JsonArray, JsonObject}
+    use OrderedJson.Json.{JNull, JBool, JNumber, JString, JArray, JObject}
 
-    OrderedJson.toPrettyString(2, value)                        -- every value on a line of its own, as the standard module writes it
-    OrderedJson.toCompactString(value)                          -- no extraneous whitespace, as the standard module writes it
-    OrderedJson.render(value)                                   -- toPrettyString(2, ·), the standard module's own default
-    OrderedJson.renderWith(Layout.Inlined(Inline.AtMost(2)), 2, value) -- an object small enough to fit joins its key's line
-    OrderedJson.renderWith(Layout.OneLine, 2, value)            -- one line, however many properties it holds
+    OrderedJson.toPrettyString(2, value)                          -- every value on a line of its own, as the standard module writes it
+    OrderedJson.toCompactString(value)                            -- no extraneous whitespace, as the standard module writes it
+    OrderedJson.renderWith(Style.Inlined(Inline.AtMost(2), 2), value) -- an object small enough to fit joins its key's line
+    OrderedJson.renderWith(Style.OneLine, value)                  -- one line, however many properties it holds
 
 ## Where the standard module's names are reused
 
-`toPrettyString` and `toCompactString` are `Util.Json`'s names and its argument order, so switching a caller between the two modules is a change of prefix. `Layout` carries no indent: the standard module keeps the indent an argument, and so does this one.
+The module is `Util/Json.flix` cut down to its encoder and re-shaped around an ordered object, so the names, the argument order, and the docstrings are that file's.
 
 | `Util.Json`                 | `OrderedJson`                     | bytes |
 | --- | --- | --- |
 | `toCompactString(j)`        | `toCompactString(j)`              | identical for a document the standard module spells the same way |
 | `toPrettyString(indent, j)` | `toPrettyString(indent, j)`       | identical, same argument order |
 | `Json`, `instance ToString` | `Json`, `instance ToString`       | the type is named `Json` here too, and `ToString` writes the compact rendering there as here |
-| `parse`, `decode`           | not here                          | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
-| `JNull` … `JObject`         | `JsonNull` … `JsonObject`         | deliberately apart: both modules are installed at once, and `JObject` naming a `Map` here as well as there is a trap |
+| `JNull`, `JBool`, `JArray`, `JNumber`, `JString` | the same | the enum is the standard's, case for case and in its order, `JArray` being a `Vector` here as there |
+| `JObject(Map[String, Json])`| `JObject(List[(String, Json)])`   | the library |
+| `Style`                     | `Style`                           | `Compact` and `Pretty(indent)` are the standard's; `Inlined(rule, indent)` and `OneLine` are added |
+| `parse`, `decode`, `FromJson` | not here                        | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
+| `toRichString`              | not here                          | needs `RichString` and the colours |
 
 ## What the library guarantees
 
 - Pure: no effect annotation, and no dependency.
-- A string is quoted and escaped by the standard module, so every character below 0x20 reaches the output escaped.
-- Numbers keep the Flix spelling: `JsonInt(42)` writes `42` and `JsonFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than becoming the 55-digit `BigDecimal` expansion the standard module writes.
-- The two standard-named renderings are compared against the standard module's own output in `TestStandard`, for a document whose keys happen to be in the order a `Map` would sort them. No claim of byte-identity survives a `Float64`.
+- A string is quoted and escaped per RFC 8259, by the standard module's own `writeEscapedChar`, so every character below 0x20 reaches the output escaped.
+- Numbers are the standard module's own: one case, `JNumber(BigDecimal)`, spelled by `BigDecimal.toPlainString`, so a `1.50` keeps its trailing zero and no magnitude reaches the output in exponent form. `NaN` and `Infinity` cannot be written at all, because a `BigDecimal` cannot hold them.
+- The standard-named renderings are compared against the standard module's own output in `TestStandard`, on a document whose keys happen to be in the order a `Map` would sort them and whose numbers a `Float64` could not have carried.
+
+## Getting a `Float64` into a `JNumber`
+
+The one trap. `Float64.tryToBigDecimal` is `new BigDecimal(x)`, which spells `0.20739060549440685` as `0.207390605494406854436562070986838079988956451416015625` — valid JSON, parsing back to the same `Float64`, and silently tripling an archive. `BigDecimal.fromString("${Float64.toString(x)}")` is exact, and is the route `Util.Json.parse` itself takes. `Int32.toBigDecimal` is exact.
 
 ## What is not the library's business
 
-The rule "an object of at most two properties, each of whose values fits on a line, is written inline" is the consumer's output contract, frozen in its committed bytes and its test suite — so it arrives as an argument, and the `2` is written in `elm-motorsport-analysis` and not here.
-
-Two things the frozen bytes pinned on the library instead. A collapsed object is `{ ... }`, a space inside each brace. And the rule governs objects only: an array of two short strings still takes one element per line.
+The rule "an object of at most two properties, each of whose values fits on a line, is written inline" is the consumer's output contract, frozen in its committed bytes and its test suite — so it arrives as an argument, and the `2` is written in `elm-motorsport-analysis` and not here. Two things the frozen bytes pinned on the library instead, a collapsed object's `{ ... }` padding and the rule governing objects and not arrays, are at `writeInline` and `collapses`.
 
 ## The layouts
 
 `Inline` is `Never`, `AtMost(n)`, or `Always` — how many properties an object may have and still be written on the line its key stands on. A value that already spans lines never collapses.
 
-| `Layout`        | array             | object                                                                |
-| --------------- | ----------------- | --------------------------------------------------------------------- |
-| `Compact`       | `[1,2]`           | `{"k":v}`, however many properties — the standard module's compact bytes |
-| `Pretty`        | one line per item | one line per property — the standard module's `Pretty`, the indent being an argument |
-| `Inlined(rule)` | one line per item | per property, unless `rule` admits the count and every value fits → one line |
-| `OneLine`       | `[1, 2]`          | `{ "k": v, … }`, however many properties                              |
+| `Style`               | array             | object                                                                |
+| --------------------- | ----------------- | --------------------------------------------------------------------- |
+| `Compact`             | `[1,2]`           | `{"k":v}`, however many properties — the standard module's compact bytes |
+| `Pretty(indent)`      | one line per item | one line per property — the standard module's `Pretty`, the indent being its own argument |
+| `Inlined(rule, ind)`  | one line per item | per property, unless `rule` admits the count and every value fits → one line |
+| `OneLine`             | `[1, 2]`          | `{ "k": v, … }`, however many properties                              |
 
 ## Consumed by
 
-`elm-motorsport-analysis` writes its timing archive with it: a 25 MB round summary, and 24,146 one-line lap records. Its check is byte identity — the five exported files hash the same before and after any change here, which is the only specification that has ever held.
+`elm-motorsport-analysis` is where this came from, and it does not reference the library yet. When it does the check is byte identity — the five exported files hash the same before and after any change here, which is the only specification that has ever held. AGENTS.md carries the commands and the five hashes.
 
 ## License
 
-Apache 2.0, the same license as the Flix standard library. The module is that library's `Util/Json.flix` re-shaped around an ordered object, and the docstrings that still describe it are that file's; `src/OrderedJson.flix` says so at its top, and `LICENSE.md` is the file the standard library's own header points to.
+Apache 2.0, the same license as the Flix standard library; AGENTS.md carries what that implies for the docstrings.
