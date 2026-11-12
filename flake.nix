@@ -13,7 +13,9 @@
         # it and 0.79.0 sit exactly the two rules this library's install instructions are
         # made of: a dependency reached through a mount, and a `package` table that accepts
         # three keys and no more. The jar is therefore pinned by URL and hash, as its
-        # consumer pins it, so that the two repositories resolve to one binary.
+        # consumer pins it, so both build the same Flix version from the same jar. Not from
+        # the same store path: each flake wraps the jar in its own nixpkgs' JDK, and the two
+        # lock different nixpkgs, so the paths differ while the compiler does not.
         flix = pkgs.flix.overrideAttrs (old: rec {
           version = "0.79.0";
           src = pkgs.fetchurl {

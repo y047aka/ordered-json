@@ -43,9 +43,9 @@ The JSON value that keeps an object's properties in the order they were authored
 | `nix run .#clean` \| `flix clean` | remove `build/` and `artifact/` |
 | `flix release` | publish a version to GitHub |
 
-Flix is 0.79.0, the same as the consumer's. The repository's own flake pins it, because nixos-26.05 carries 0.69.1 — on the wrong side of both the mount rule and the `package` table rule this library's install instructions are made of — and the pin is the consumer's own `overrideAttrs`, jar URL and hash included, so the two repositories resolve to one binary. `nix develop --command flix …` therefore works from a clone alone.
+Flix is 0.79.0, the same as the consumer's. The repository's own flake pins it, because nixos-26.05 carries 0.69.1 — on the wrong side of both the mount rule and the `package` table rule this library's install instructions are made of — and the pin is the consumer's own `overrideAttrs`, jar URL and hash included, so both build the same Flix version from the same jar. Not the same store path: each flake wraps the jar in its own nixpkgs' JDK, and the two lock different nixpkgs. `nix develop --command flix …` therefore works from a clone alone.
 
-CI runs `nix flake check`, `nix run .#test`, and `nix run .#pkg` on `main` and on every PR. There is no app for `release`: publishing a version stays a human act, and its token is never a repository secret.
+CI runs `nix flake check`, `nix run .#test`, and `nix run .#pkg` on `main` and on every PR, beside a second job that runs `flix test` under the manifest's floor of 0.76.2 — as a jar, nixos-26.05 carrying only 0.69.1. There is no app for `release`: publishing a version stays a human act, and its token is never a repository secret.
 
 ## Verification
 
