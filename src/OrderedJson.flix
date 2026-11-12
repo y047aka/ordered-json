@@ -91,13 +91,6 @@ pub mod OrderedJson {
     }
 
     ///
-    /// The pretty rendering at the standard module's own default of two spaces
-    /// per nesting level.
-    ///
-    pub def render(j: Json): String =
-        toPrettyString(2, j)
-
-    ///
     /// Returns the JSON rendering of `j` under the layout `s`.
     ///
     pub def renderWith(s: Style, j: Json): String = region rc {

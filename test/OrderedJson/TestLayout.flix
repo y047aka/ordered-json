@@ -2,7 +2,7 @@
 pub mod OrderedJson.TestLayout {
 
     use Assert.assertEq;
-    use OrderedJson.render
+    use OrderedJson.toPrettyString
     use OrderedJson.renderWith
     use OrderedJson.Style
     use OrderedJson.Inline
@@ -140,13 +140,13 @@ pub mod OrderedJson.TestLayout {
         Assert.assertTrue(not String.contains({substr = "\n"}, onOneLine(obj)))
 
     @Test
-    def testExpandedObjectMatchesRender(): Unit \ Assert =
+    def testExpandedObjectMatchesPrettyString(): Unit \ Assert =
         let obj = JObject(
             ("name", JString("test")) ::
             ("season", JInt(2025)) ::
             ("laps", JArray(Vector#{JInt(1), JInt(2)})) ::
             Nil
         );
-        assertEq(expected = render(obj), inlined(obj))
+        assertEq(expected = toPrettyString(2, obj), inlined(obj))
 
 }

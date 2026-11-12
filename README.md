@@ -12,7 +12,6 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
     OrderedJson.toPrettyString(2, value)                          -- every value on a line of its own, as the standard module writes it
     OrderedJson.toCompactString(value)                            -- no extraneous whitespace, as the standard module writes it
-    OrderedJson.render(value)                                     -- toPrettyString(2, ·), the standard module's own default
     OrderedJson.renderWith(Style.Inlined(Inline.AtMost(2), 2), value) -- an object small enough to fit joins its key's line
     OrderedJson.renderWith(Style.OneLine, value)                  -- one line, however many properties it holds
 

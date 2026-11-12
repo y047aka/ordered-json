@@ -33,10 +33,6 @@ pub mod OrderedJson.TestStandard {
             case Result.Err(_) => Assert.assertTrue(false)
         }
 
-    @Test
-    def testRenderIsTheStandardDefaultOfTwoSpaces(): Unit \ Assert =
-        assertEq(expected = OrderedJson.toPrettyString(2, document()), OrderedJson.render(document()))
-
     /// The standard module's `instance ToString[Json]` writes the compact rendering, and this one does too.
     @Test
     def testToStringIsTheCompactRendering(): Unit \ Assert =

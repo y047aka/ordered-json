@@ -36,7 +36,7 @@ The JSON value that keeps an object's properties in the order they were authored
 | Command | Purpose |
 | --- | --- |
 | `flix build` | compile |
-| `flix test` | 72 tests |
+| `flix test` | 71 tests |
 | `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
 | `flix release` | publish a version to GitHub |
 
