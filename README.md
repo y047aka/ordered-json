@@ -8,31 +8,35 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
 ## The surface a caller needs
 
-    use OrderedJson.Json.{JsonNull, JsonBool, JsonInt, JsonFloat, JsonString, JsonArray, JsonObject}
+    use OrderedJson.Json.{JNull, JBool, JInt, JFloat, JString, JArray, JObject}
 
-    OrderedJson.toPrettyString(2, value)                        -- every value on a line of its own, as the standard module writes it
-    OrderedJson.toCompactString(value)                          -- no extraneous whitespace, as the standard module writes it
-    OrderedJson.render(value)                                   -- toPrettyString(2, ·), the standard module's own default
-    OrderedJson.renderWith(Layout.Inlined(Inline.AtMost(2)), 2, value) -- an object small enough to fit joins its key's line
-    OrderedJson.renderWith(Layout.OneLine, 2, value)            -- one line, however many properties it holds
+    OrderedJson.toPrettyString(2, value)                          -- every value on a line of its own, as the standard module writes it
+    OrderedJson.toCompactString(value)                            -- no extraneous whitespace, as the standard module writes it
+    OrderedJson.render(value)                                     -- toPrettyString(2, ·), the standard module's own default
+    OrderedJson.renderWith(Style.Inlined(Inline.AtMost(2), 2), value) -- an object small enough to fit joins its key's line
+    OrderedJson.renderWith(Style.OneLine, value)                  -- one line, however many properties it holds
 
 ## Where the standard module's names are reused
 
-`toPrettyString` and `toCompactString` are `Util.Json`'s names and its argument order, so switching a caller between the two modules is a change of prefix. `Layout` carries no indent: the standard module keeps the indent an argument, and so does this one.
+The module is `Util/Json.flix` cut down to its encoder and re-shaped around an ordered object, so the names, the argument order, and the docstrings are that file's. `toPrettyString` and `toCompactString` are its names and its argument order, and `Style` carries the indent where the standard module carries it.
 
 | `Util.Json`                 | `OrderedJson`                     | bytes |
 | --- | --- | --- |
 | `toCompactString(j)`        | `toCompactString(j)`              | identical for a document the standard module spells the same way |
 | `toPrettyString(indent, j)` | `toPrettyString(indent, j)`       | identical, same argument order |
 | `Json`, `instance ToString` | `Json`, `instance ToString`       | the type is named `Json` here too, and `ToString` writes the compact rendering there as here |
+| `JNull`, `JBool`, `JArray`, `JString` | the same  | the cases are the standard's, and `JArray` is a `Vector` here as there |
+| `JNumber(BigDecimal)`       | `JInt(Int32)`, `JFloat(Float64)`  | apart on purpose: a `Float64` through `BigDecimal` spells 17 significant digits as 55 |
+| `JObject(Map[String, Json])`| `JObject(List[(String, Json)])`   | the library |
+| `Style`                     | `Style`                           | `Compact` and `Pretty(indent)` are the standard's; `Inlined(rule, indent)` and `OneLine` are added |
 | `parse`, `decode`           | not here                          | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
-| `JNull` … `JObject`         | `JsonNull` … `JsonObject`         | deliberately apart: both modules are installed at once, and `JObject` naming a `Map` here as well as there is a trap |
+| `toRichString`              | not here                          | needs `RichString` and the colours |
 
 ## What the library guarantees
 
 - Pure: no effect annotation, and no dependency.
-- A string is quoted and escaped by the standard module, so every character below 0x20 reaches the output escaped.
-- Numbers keep the Flix spelling: `JsonInt(42)` writes `42` and `JsonFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than becoming the 55-digit `BigDecimal` expansion the standard module writes.
+- A string is quoted and escaped per RFC 8259, by the standard module's own `writeEscapedChar`, so every character below 0x20 reaches the output escaped.
+- Numbers keep the Flix spelling: `JInt(42)` writes `42` and `JFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than becoming the 55-digit `BigDecimal` expansion the standard module writes.
 - The two standard-named renderings are compared against the standard module's own output in `TestStandard`, for a document whose keys happen to be in the order a `Map` would sort them. No claim of byte-identity survives a `Float64`.
 
 ## What is not the library's business
@@ -45,12 +49,12 @@ Two things the frozen bytes pinned on the library instead. A collapsed object is
 
 `Inline` is `Never`, `AtMost(n)`, or `Always` — how many properties an object may have and still be written on the line its key stands on. A value that already spans lines never collapses.
 
-| `Layout`        | array             | object                                                                |
-| --------------- | ----------------- | --------------------------------------------------------------------- |
-| `Compact`       | `[1,2]`           | `{"k":v}`, however many properties — the standard module's compact bytes |
-| `Pretty`        | one line per item | one line per property — the standard module's `Pretty`, the indent being an argument |
-| `Inlined(rule)` | one line per item | per property, unless `rule` admits the count and every value fits → one line |
-| `OneLine`       | `[1, 2]`          | `{ "k": v, … }`, however many properties                              |
+| `Style`               | array             | object                                                                |
+| --------------------- | ----------------- | --------------------------------------------------------------------- |
+| `Compact`             | `[1,2]`           | `{"k":v}`, however many properties — the standard module's compact bytes |
+| `Pretty(indent)`      | one line per item | one line per property — the standard module's `Pretty`, the indent being its own argument |
+| `Inlined(rule, ind)`  | one line per item | per property, unless `rule` admits the count and every value fits → one line |
+| `OneLine`             | `[1, 2]`          | `{ "k": v, … }`, however many properties                              |
 
 ## Consumed by
 
@@ -58,4 +62,4 @@ Two things the frozen bytes pinned on the library instead. A collapsed object is
 
 ## License
 
-Apache 2.0, the same license as the Flix standard library. The module is that library's `Util/Json.flix` re-shaped around an ordered object, and the docstrings that still describe it are that file's; `src/OrderedJson.flix` says so at its top, and `LICENSE.md` is the file the standard library's own header points to.
+Apache 2.0, the same license as the Flix standard library. The module is that library's `Util/Json.flix` re-shaped around an ordered object, and the docstrings that still describe it are that file's; `src/OrderedJson.flix` says so at its top, and `LICENSE.md` is the file the standard library's own header points to. The standard library's own `TestJson.flix` is kept in `test/OrderedJson/`, reduced to the encoder, and still passes.

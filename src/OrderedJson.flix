@@ -110,7 +110,8 @@ pub mod OrderedJson {
     /// Appends the JSON rendering of `j` to `sb` using style `s`.
     ///
     /// `d` is the current nesting level (0 at the root); it is ignored in
-    /// `Compact` style. Empty arrays and objects always render as `[]` or `{}`.
+    /// `Compact` and `OneLine` styles. Empty arrays and objects always render as
+    /// `[]` or `{}`.
     ///
     def write(j: Json, d: Int32, s: Style, sb: StringBuilder[r]): Unit \ r = match j {
         case JArray(v) =>
