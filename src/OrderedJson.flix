@@ -250,16 +250,6 @@ pub mod OrderedJson {
         if (n > 0) { StringBuilder.appendString(String.repeat(n, " "), sb) }
 
     ///
-    /// Returns `s` as a JSON string literal: enclosed in double quotes, with
-    /// backslash, double-quote, and control characters escaped per RFC 8259.
-    ///
-    pub def escapeString(s: String): String = region rc {
-        let sb = StringBuilder.empty(rc);
-        writeEscaped(s, sb);
-        StringBuilder.toString(sb)
-    }
-
-    ///
     /// Appends `s` to `sb` as a JSON string literal: enclosed in double quotes,
     /// with backslash, double-quote, and control characters escaped per RFC 8259.
     ///
