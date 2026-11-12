@@ -17,7 +17,7 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
 ## Where the standard module's names are reused
 
-The module is `Util/Json.flix` cut down to its encoder and re-shaped around an ordered object, so the names, the argument order, and the docstrings are that file's. `toPrettyString` and `toCompactString` are its names and its argument order, and `Style` carries the indent where the standard module carries it.
+The module is `Util/Json.flix` cut down to its encoder and re-shaped around an ordered object, so the names, the argument order, and the docstrings are that file's.
 
 | `Util.Json`                 | `OrderedJson`                     | bytes |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ The module is `Util/Json.flix` cut down to its encoder and re-shaped around an o
 | `JNull`, `JBool`, `JArray`, `JNumber`, `JString` | the same | the enum is the standard's, case for case and in its order, `JArray` being a `Vector` here as there |
 | `JObject(Map[String, Json])`| `JObject(List[(String, Json)])`   | the library |
 | `Style`                     | `Style`                           | `Compact` and `Pretty(indent)` are the standard's; `Inlined(rule, indent)` and `OneLine` are added |
-| `parse`, `decode`           | not here                          | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
+| `parse`, `decode`, `FromJson` | not here                        | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
 | `toRichString`              | not here                          | needs `RichString` and the colours |
 
 ## What the library guarantees
@@ -35,14 +35,15 @@ The module is `Util/Json.flix` cut down to its encoder and re-shaped around an o
 - Pure: no effect annotation, and no dependency.
 - A string is quoted and escaped per RFC 8259, by the standard module's own `writeEscapedChar`, so every character below 0x20 reaches the output escaped.
 - Numbers are the standard module's own: one case, `JNumber(BigDecimal)`, spelled by `BigDecimal.toPlainString`, so a `1.50` keeps its trailing zero and no magnitude reaches the output in exponent form. `NaN` and `Infinity` cannot be written at all, because a `BigDecimal` cannot hold them.
-- Getting a `Float64` into a `JNumber` is the caller's business, and it is the one trap here. `Float64.tryToBigDecimal` is `new BigDecimal(x)`, which spells `0.20739060549440685` as `0.207390605494406854436562070986838079988956451416015625`. `BigDecimal.fromString("${Float64.toString(x)}")` is exact, and is the route `Util.Json.parse` itself takes. `Int32.toBigDecimal` is exact.
-- The two standard-named renderings are compared against the standard module's own output in `TestStandard`, on a document whose keys happen to be in the order a `Map` would sort them and whose numbers include the 17 significant digits a timing archive is full of and a `1.50` that keeps its trailing zero.
+- The standard-named renderings are compared against the standard module's own output in `TestStandard`, on a document whose keys happen to be in the order a `Map` would sort them and whose numbers a `Float64` could not have carried.
+
+## Getting a `Float64` into a `JNumber`
+
+The one trap. `Float64.tryToBigDecimal` is `new BigDecimal(x)`, which spells `0.20739060549440685` as `0.207390605494406854436562070986838079988956451416015625` — valid JSON, parsing back to the same `Float64`, and silently tripling an archive. `BigDecimal.fromString("${Float64.toString(x)}")` is exact, and is the route `Util.Json.parse` itself takes. `Int32.toBigDecimal` is exact.
 
 ## What is not the library's business
 
-The rule "an object of at most two properties, each of whose values fits on a line, is written inline" is the consumer's output contract, frozen in its committed bytes and its test suite — so it arrives as an argument, and the `2` is written in `elm-motorsport-analysis` and not here.
-
-Two things the frozen bytes pinned on the library instead. A collapsed object is `{ ... }`, a space inside each brace. And the rule governs objects only: an array of two short strings still takes one element per line.
+The rule "an object of at most two properties, each of whose values fits on a line, is written inline" is the consumer's output contract, frozen in its committed bytes and its test suite — so it arrives as an argument, and the `2` is written in `elm-motorsport-analysis` and not here. Two things the frozen bytes pinned on the library instead, a collapsed object's `{ ... }` padding and the rule governing objects and not arrays, are at `writeInline` and `collapses`.
 
 ## The layouts
 
@@ -57,8 +58,8 @@ Two things the frozen bytes pinned on the library instead. A collapsed object is
 
 ## Consumed by
 
-`elm-motorsport-analysis` writes its timing archive with it: a 25 MB round summary, and 24,146 one-line lap records. Its check is byte identity — the five exported files hash the same before and after any change here, which is the only specification that has ever held.
+`elm-motorsport-analysis` is where this came from, and it does not reference the library yet. When it does the check is byte identity — the five exported files hash the same before and after any change here, which is the only specification that has ever held. AGENTS.md carries the commands and the five hashes.
 
 ## License
 
-Apache 2.0, the same license as the Flix standard library. The module is that library's `Util/Json.flix` re-shaped around an ordered object, and the docstrings that still describe it are that file's; `src/OrderedJson.flix` says so at its top, and its header points at this repository's `LICENSE`. The standard library's own `TestJson.flix` is kept in `test/OrderedJson/`, reduced to the encoder, and still passes.
+Apache 2.0, the same license as the Flix standard library; AGENTS.md carries what that implies for the docstrings.
