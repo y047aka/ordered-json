@@ -37,3 +37,29 @@ jobs:
       # first time anyone learns whether it still builds.
       - name: Package
         run: nix run .#pkg
+
+  floor:
+    # The `flix` field of the manifest is a lower bound the compiler enforces on anyone
+    # installing the package, so declaring it is making a promise: at 0.79.0 a project on
+    # 0.76 through 0.78 is refused outright. 0.76.2 is the oldest version the three-key
+    # `package` table exists under — 0.76.0 still requires `package.name`, which 0.79
+    # forbids — and the whole suite passes there unchanged.
+    # Not through Nix: nixos-26.05 carries Flix 0.69.1, and a second flake would only
+    # suggest the toolchain everything is developed and released with has moved.
+    name: Flix 0.76.2, the manifest floor
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Fetch Flix 0.76.2
+        run: |
+          curl -sSfL --max-time 300 -o flix.jar https://github.com/flix/flix/releases/download/v0.76.2/flix.jar
+          echo "be06d8c0cc3afdf676981f48d743354151c7060f6fe8e689720226682a80c8ae  flix.jar" | sha256sum --check --status
+      - name: Test
+        run: java -jar flix.jar test
