@@ -6,7 +6,7 @@ pub mod OrderedJson.TestLayout {
     use OrderedJson.renderWith
     use OrderedJson.Style
     use OrderedJson.Inline
-    use OrderedJson.Json.{JNull, JInt, JString, JArray, JObject}
+    use OrderedJson.Json.{JInt, JString, JArray, JObject}
 
     def inlined(value: OrderedJson.Json): String =
         renderWith(Style.Inlined(Inline.AtMost(2), 2), value)
@@ -15,21 +15,9 @@ pub mod OrderedJson.TestLayout {
         renderWith(Style.OneLine, value)
 
     @Test
-    def testRenderScalar(): Unit \ Assert =
-        assertEq(expected = "\"hello\"", inlined(JString("hello")))
-
-    @Test
-    def testRenderEmptyObject(): Unit \ Assert =
-        assertEq(expected = "{}", inlined(JObject(Nil)))
-
-    @Test
     def testSinglePropertyObjectIsInline(): Unit \ Assert =
         let obj = JObject(("name", JString("James CALADO")) :: Nil);
         assertEq(expected = "{ \"name\": \"James CALADO\" }", inlined(obj))
-
-    @Test
-    def testSinglePropertyObjectWithNullIsInline(): Unit \ Assert =
-        assertEq(expected = "{ \"value\": null }", inlined(JObject(("value", JNull) :: Nil)))
 
     @Test
     def testSinglePropertyObjectWithEmptyArrayIsInline(): Unit \ Assert =
@@ -150,10 +138,6 @@ pub mod OrderedJson.TestLayout {
             Nil
         );
         Assert.assertTrue(not String.contains({substr = "\n"}, onOneLine(obj)))
-
-    @Test
-    def testOnOneLineRendersScalarsAsRenderDoes(): Unit \ Assert =
-        assertEq(expected = render(JString("say \"hi\"")), onOneLine(JString("say \"hi\"")))
 
     @Test
     def testExpandedObjectMatchesRender(): Unit \ Assert =

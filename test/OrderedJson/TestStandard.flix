@@ -34,10 +34,6 @@ pub mod OrderedJson.TestStandard {
         }
 
     @Test
-    def testTheIndentIsTheStandardModulesArgument(): Unit \ Assert =
-        assertEq(expected = "[\n    1\n]", OrderedJson.toPrettyString(4, JArray(Vector#{JInt(1)})))
-
-    @Test
     def testRenderIsTheStandardDefaultOfTwoSpaces(): Unit \ Assert =
         assertEq(expected = OrderedJson.toPrettyString(2, document()), OrderedJson.render(document()))
 

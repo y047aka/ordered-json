@@ -28,7 +28,7 @@ The JSON value that keeps an object's properties in the order they were authored
 - `Util.Json` is the standard library's own module: a project may nest under it, which is why the module could live at `Util.Json.Encode`, but Flix 0.79 refuses a second declaration of it.
 - `Util.Json.parse` refuses a duplicate key with `DuplicateKey`, and accepts a raw control character inside a string. It is therefore a fence on key order and not on escaping. It is also the only thing left asked of the standard module, in `TestStandard`.
 - A Flix file must be named for the module it declares: `pub mod OrderedJson.JsonPath` lives at `src/OrderedJson/JsonPath.flix`, and a child module cannot be declared until its parent is. Flix reports both as `Mismatched module and file` and `Orphaned module`, and the errors cascade into hundreds.
-- Flix string literals have no `\b`, `\f` or `\uXXXX`. Char literals do, and `Char.toString('\u0008')` is how a test builds one.
+- Flix string literals have no `\b` or `\f`, but `\uXXXX` works, so a control character is written `"\u0008"` and not built with `Char.toString`. Char literals take both.
 - `flix install` resolves `owner/name[@ver]` from GitHub and `flix release` publishes there. There is no local-path dependency.
 
 ## Commands
@@ -36,7 +36,7 @@ The JSON value that keeps an object's properties in the order they were authored
 | Command | Purpose |
 | --- | --- |
 | `flix build` | compile |
-| `flix test` | 88 tests |
+| `flix test` | 72 tests |
 | `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
 | `flix release` | publish a version to GitHub |
 
