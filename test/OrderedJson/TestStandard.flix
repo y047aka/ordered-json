@@ -5,19 +5,29 @@ pub mod OrderedJson.TestStandard {
 
     use Assert.assertEq;
     use OrderedJson.Style
-    use OrderedJson.Json.{JNull, JBool, JInt, JString, JArray, JObject}
+    use OrderedJson.Json.{JNull, JBool, JNumber, JString, JArray, JObject}
+
+    def num(n: Int32): OrderedJson.Json = JNumber(Int32.toBigDecimal(n))
+
+    /// The one route from a spelled number to a `BigDecimal` that does not widen it, which is also the route `Util.Json.parse` takes.
+    def dec(s: String): OrderedJson.Json = match BigDecimal.fromString(s) {
+        case Some(d) => JNumber(d)
+        case None    => JNull
+    }
 
     /// The same document as `standard`, authored in the order `standard` spells it in.
     def document(): OrderedJson.Json =
         JObject(
             ("a", JNull) ::
-            ("b", JArray(Vector#{JInt(1), JBool(true)})) ::
+            ("b", JArray(Vector#{num(1), JBool(true)})) ::
             ("c", JObject(("d", JString("x")) :: Nil)) ::
+            ("e", dec("0.20739060549440685")) ::
+            ("f", dec("1.50")) ::
             Nil
         )
 
     def standard(): String =
-        "{\"a\":null,\"b\":[1,true],\"c\":{\"d\":\"x\"}}"
+        "{\"a\":null,\"b\":[1,true],\"c\":{\"d\":\"x\"},\"e\":0.20739060549440685,\"f\":1.50}"
 
     @Test
     def testTheCompactBytesAreTheStandardModules(): Unit \ Assert =
@@ -41,7 +51,7 @@ pub mod OrderedJson.TestStandard {
     /// The one-line layout of this library is not the standard module's compact one: it keeps a space after every colon, and inside a collapsed object.
     @Test
     def testOneLineIsNotCompact(): Unit \ Assert =
-        let obj = JObject(("a", JInt(1)) :: ("b", JInt(2)) :: Nil);
+        let obj = JObject(("a", num(1)) :: ("b", num(2)) :: Nil);
         Assert.assertTrue(
             OrderedJson.renderWith(Style.OneLine, obj) == "{ \"a\": 1, \"b\": 2 }" and
             OrderedJson.renderWith(Style.Compact, obj) == "{\"a\":1,\"b\":2}"

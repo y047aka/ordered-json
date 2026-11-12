@@ -13,22 +13,20 @@
 ///
 pub mod OrderedJson {
 
-    use OrderedJson.Json.{JArray, JBool, JFloat, JInt, JNull, JObject, JString}
+    use OrderedJson.Json.{JArray, JBool, JNull, JNumber, JObject, JString}
 
     ///
     /// Type of JSON values.
     ///
-    /// JSON numbers are stored as `Int32` and `Float64`, which spells a
-    /// `Float64` the way `Double.toString` spells it;
+    /// JSON numbers are stored as `BigDecimal` for lossless round-trip;
     /// JSON objects are stored as `List[(String, Json)]`, which gives
     /// the authored key order on output.
     ///
     pub enum Json with Eq {
         case JArray(Vector[Json])
         case JBool(Bool)
-        case JFloat(Float64)
-        case JInt(Int32)
         case JNull
+        case JNumber(BigDecimal)
         case JObject(List[(String, Json)])
         case JString(String)
     }
@@ -121,12 +119,10 @@ pub mod OrderedJson {
             }
         case JBool(b) =>
             StringBuilder.appendString(if (b) "true" else "false", sb)
-        case JFloat(n) =>
-            StringBuilder.appendString(Float64.toString(n), sb)
-        case JInt(n) =>
-            StringBuilder.appendString(Int32.toString(n), sb)
         case JNull =>
             StringBuilder.appendString("null", sb)
+        case JNumber(n) =>
+            StringBuilder.appendString(BigDecimal.toPlainString(n), sb)
         case JObject(kvs) =>
             if (List.isEmpty(kvs))
                 StringBuilder.appendString("{}", sb)

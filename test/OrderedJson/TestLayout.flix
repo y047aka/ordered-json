@@ -6,7 +6,9 @@ pub mod OrderedJson.TestLayout {
     use OrderedJson.renderWith
     use OrderedJson.Style
     use OrderedJson.Inline
-    use OrderedJson.Json.{JInt, JString, JArray, JObject}
+    use OrderedJson.Json.{JNumber, JString, JArray, JObject}
+
+    def num(n: Int32): OrderedJson.Json = JNumber(Int32.toBigDecimal(n))
 
     def inlined(value: OrderedJson.Json): String =
         renderWith(Style.Inlined(Inline.AtMost(2), 2), value)
@@ -55,7 +57,7 @@ pub mod OrderedJson.TestLayout {
     def testTwoPropertyObjectWithOneMultiLineValueIsNotInline(): Unit \ Assert =
         let obj = JObject(
             ("name", JString("test")) ::
-            ("laps", JArray(Vector#{JInt(1), JInt(2)})) ::
+            ("laps", JArray(Vector#{num(1), num(2)})) ::
             Nil
         );
         assertEq(expected = "{\n  \"name\": \"test\",\n  \"laps\": [\n    1,\n    2\n  ]\n}", inlined(obj))
@@ -96,7 +98,7 @@ pub mod OrderedJson.TestLayout {
 
     @Test
     def testKeyIsEscaped(): Unit \ Assert =
-        let obj = JObject(("say \"hi\"", JInt(1)) :: Nil);
+        let obj = JObject(("say \"hi\"", num(1)) :: Nil);
         assertEq(expected = "{ \"say \\\"hi\\\"\": 1 }", inlined(obj))
 
     @Test
@@ -104,7 +106,7 @@ pub mod OrderedJson.TestLayout {
         let obj = JObject(
             ("carNumber", JString("007")) ::
             ("driverName", JString("Harry TINCKNELL")) ::
-            ("lapNumber", JInt(1)) ::
+            ("lapNumber", num(1)) ::
             ("elapsed", JString("1:42.619")) ::
             Nil
         );
@@ -121,7 +123,7 @@ pub mod OrderedJson.TestLayout {
                 ("z4",   JObject(("time", JString("13.826")) :: ("elapsed", JString("34.534")) :: Nil)) ::
                 Nil
             )) ::
-            ("laps", JArray(Vector#{JInt(1), JInt(2)})) ::
+            ("laps", JArray(Vector#{num(1), num(2)})) ::
             Nil
         );
         assertEq(
@@ -132,7 +134,7 @@ pub mod OrderedJson.TestLayout {
     @Test
     def testOnOneLineNeverEmitsANewline(): Unit \ Assert =
         let obj = JObject(
-            ("a", JArray(Vector#{JObject(("b", JInt(1)) :: ("c", JInt(2)) :: ("d", JInt(3)) :: Nil)})) ::
+            ("a", JArray(Vector#{JObject(("b", num(1)) :: ("c", num(2)) :: ("d", num(3)) :: Nil)})) ::
             ("e", JObject(Nil)) ::
             ("f", JArray(Vector#{})) ::
             Nil
@@ -143,8 +145,8 @@ pub mod OrderedJson.TestLayout {
     def testExpandedObjectMatchesPrettyString(): Unit \ Assert =
         let obj = JObject(
             ("name", JString("test")) ::
-            ("season", JInt(2025)) ::
-            ("laps", JArray(Vector#{JInt(1), JInt(2)})) ::
+            ("season", num(2025)) ::
+            ("laps", JArray(Vector#{num(1), num(2)})) ::
             Nil
         );
         assertEq(expected = toPrettyString(2, obj), inlined(obj))

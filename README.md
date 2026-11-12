@@ -8,7 +8,7 @@ The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(
 
 ## The surface a caller needs
 
-    use OrderedJson.Json.{JNull, JBool, JInt, JFloat, JString, JArray, JObject}
+    use OrderedJson.Json.{JNull, JBool, JNumber, JString, JArray, JObject}
 
     OrderedJson.toPrettyString(2, value)                          -- every value on a line of its own, as the standard module writes it
     OrderedJson.toCompactString(value)                            -- no extraneous whitespace, as the standard module writes it
@@ -24,8 +24,7 @@ The module is `Util/Json.flix` cut down to its encoder and re-shaped around an o
 | `toCompactString(j)`        | `toCompactString(j)`              | identical for a document the standard module spells the same way |
 | `toPrettyString(indent, j)` | `toPrettyString(indent, j)`       | identical, same argument order |
 | `Json`, `instance ToString` | `Json`, `instance ToString`       | the type is named `Json` here too, and `ToString` writes the compact rendering there as here |
-| `JNull`, `JBool`, `JArray`, `JString` | the same  | the cases are the standard's, and `JArray` is a `Vector` here as there |
-| `JNumber(BigDecimal)`       | `JInt(Int32)`, `JFloat(Float64)`  | apart on purpose: Flix's only `Float64` → `BigDecimal` conversion, `new BigDecimal(x)`, spells 17 significant digits as 55 |
+| `JNull`, `JBool`, `JArray`, `JNumber`, `JString` | the same | the enum is the standard's, case for case and in its order, `JArray` being a `Vector` here as there |
 | `JObject(Map[String, Json])`| `JObject(List[(String, Json)])`   | the library |
 | `Style`                     | `Style`                           | `Compact` and `Pretty(indent)` are the standard's; `Inlined(rule, indent)` and `OneLine` are added |
 | `parse`, `decode`           | not here                          | the standard parser puts an object into a `Map`, so a parsed document's authored order is gone before any encoder could be asked for it |
@@ -35,9 +34,9 @@ The module is `Util/Json.flix` cut down to its encoder and re-shaped around an o
 
 - Pure: no effect annotation, and no dependency.
 - A string is quoted and escaped per RFC 8259, by the standard module's own `writeEscapedChar`, so every character below 0x20 reaches the output escaped.
-- Numbers keep the Flix spelling: `JInt(42)` writes `42` and `JFloat(x)` writes what `Double.toString` gives, so `0.20739060549440685` stays 17 digits rather than the 55-digit decimal `Float64.tryToBigDecimal` writes into a `BigDecimal`.
-- `NaN` and `Infinity` are not guarded. `Float64` can hold both and `Double.toString` spells them, so `JFloat(Float64.nan())` writes `NaN`, which is not JSON; the standard module's `BigDecimal` cannot express either. Magnitudes at or beyond `1e21`, or below `1e-6`, come out with an exponent (`1.0E21`, `1.0E-7`) — valid JSON, and bytes the standard module would never write.
-- The two standard-named renderings are compared against the standard module's own output in `TestStandard`, for a document whose keys happen to be in the order a `Map` would sort them. No claim of byte-identity survives a `Float64`.
+- Numbers are the standard module's own: one case, `JNumber(BigDecimal)`, spelled by `BigDecimal.toPlainString`, so a `1.50` keeps its trailing zero and no magnitude reaches the output in exponent form. `NaN` and `Infinity` cannot be written at all, because a `BigDecimal` cannot hold them.
+- Getting a `Float64` into a `JNumber` is the caller's business, and it is the one trap here. `Float64.tryToBigDecimal` is `new BigDecimal(x)`, which spells `0.20739060549440685` as `0.207390605494406854436562070986838079988956451416015625`. `BigDecimal.fromString("${Float64.toString(x)}")` is exact, and is the route `Util.Json.parse` itself takes. `Int32.toBigDecimal` is exact.
+- The two standard-named renderings are compared against the standard module's own output in `TestStandard`, on a document whose keys happen to be in the order a `Map` would sort them and whose numbers include the 17 significant digits a timing archive is full of and a `1.50` that keeps its trailing zero.
 
 ## What is not the library's business
 

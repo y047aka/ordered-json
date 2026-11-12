@@ -2,9 +2,9 @@ mod OrderedJson.TestJson {
 
     use Assert.assertEq;
 
-    use OrderedJson.Json.{JArray, JBool, JNull, JFloat, JInt, JObject, JString}
+    use OrderedJson.Json.{JArray, JBool, JNull, JNumber, JObject, JString}
 
-    def num(n: Int32): OrderedJson.Json = JInt(n)
+    def num(n: Int32): OrderedJson.Json = JNumber(Int32.toBigDecimal(n))
 
     /////////////////////////////////////////////////////////////////////////////
     // toCompactString — primitives                                            //
@@ -36,7 +36,7 @@ mod OrderedJson.TestJson {
 
     @Test
     def toCompactString07(): Unit \ Assert =
-        assertEq(expected = "3.14", OrderedJson.toCompactString(JFloat(3.14)))
+        assertEq(expected = "3.14", OrderedJson.toCompactString(JNumber(3.14ff)))
 
     /////////////////////////////////////////////////////////////////////////////
     // toCompactString — strings (no escape needed)                            //
