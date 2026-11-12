@@ -35,12 +35,17 @@ The JSON value that keeps an object's properties in the order they were authored
 
 | Command | Purpose |
 | --- | --- |
-| `flix build` | compile |
-| `flix test` | 69 tests |
-| `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
+| `nix run .#check` \| `flix check` | type-check |
+| `nix run .#test` \| `flix test` | 69 tests |
+| `nix run .#build` \| `flix build` | compile |
+| `nix run .#pkg` \| `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
+| `nix run .#doc` \| `flix doc` | API documentation, at `build/doc` |
+| `nix run .#clean` \| `flix clean` | remove `build/` and `artifact/` |
 | `flix release` | publish a version to GitHub |
 
-Flix is 0.79.0, the same as the consumer, and the toolchain is otherwise reached through the consumer's Nix flake (`nix develop`, or `nix develop --command flix …` from a checkout of it).
+Flix is 0.79.0, the same as the consumer's. The repository's own flake pins it, because nixos-26.05 carries 0.69.1 — on the wrong side of both the mount rule and the `package` table rule this library's install instructions are made of — and the pin is the consumer's own `overrideAttrs`, jar URL and hash included, so the two repositories resolve to one binary. `nix develop --command flix …` therefore works from a clone alone.
+
+CI runs `nix flake check`, `nix run .#test`, and `nix run .#pkg` on `main` and on every PR. There is no app for `release`: publishing a version stays a human act, and its token is never a repository secret.
 
 ## Verification
 
