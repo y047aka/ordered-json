@@ -1,4 +1,4 @@
-/// The property-count limit is the caller's, so it arrives as an argument, and `AtMost(2)` is the one the consumer's committed bytes froze.
+/// The property-count limit is the caller's, so it arrives as an argument, and `AtMost(2)` is the one every example here passes.
 pub mod OrderedJson.TestLayout {
 
     use Assert.assertEq;

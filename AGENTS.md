@@ -6,7 +6,7 @@ The JSON value that keeps an object's properties in the order they were authored
 
 - The library owns `OrderedJson.Json`, the traversal, the escaping, the number spelling, `Style`, `Inline`, and the `{ ... }` padding a collapsed object gets.
 - The consumer owns which layout its files use with which `Inline` rule — `Style.Inlined(Inline.AtMost(2), 2)` — and the fact that it appends a key (`index`, `position`) to a value another module wrote. Its `Extra` module does not come here; it only picks a layout now, which is what makes it the consumer's and not ours.
-- Where the standard module already named a function, a type, or a case, its name and argument order are reused. README's table is the inventory.
+- Where the standard module already named a function, a type, or a case, its name and argument order are reused. `flix doc` renders the public surface, and the module is the inventory.
 - Naming is decided: repo `ordered-json`, module `OrderedJson`, value type `OrderedJson.Json`, and the standard module's own case names. `JObject` naming a `Map` there and a `List` here is the trap to watch; the prefix is what keeps the two types apart at a call site.
 
 ## Facts about the standard library already paid for; do not re-derive them
@@ -26,18 +26,26 @@ The JSON value that keeps an object's properties in the order they were authored
 - `Util.Json` is the standard library's own module: a project may nest under it, which is why the module could live at `Util.Json.Encode`, but Flix 0.79 refuses a second declaration of it.
 - A Flix file must be named for the module it declares: `pub mod OrderedJson.JsonPath` lives at `src/OrderedJson/JsonPath.flix`, and a child module cannot be declared until its parent is. Flix reports both as `Mismatched module and file` and `Orphaned module`, and the errors cascade into hundreds.
 - Flix string literals have no `\b` or `\f`, but `\uXXXX` works, so a control character is written `"\u0008"` and not built with `Char.toString`. Char literals take both.
-- `flix install` resolves `owner/name[@ver]` from GitHub and `flix release` publishes there. There is no local-path dependency.
+- `flix install` resolves `owner/name[@ver]` from GitHub, and a dependency is declared as `"github:owner/name" = { version, mount }`. There is no local-path dependency.
+- A dependency is reached through a mount, and `ordered-json` cannot be one: a mount is a letter followed by letters, digits, or underscores, and a hyphen reads as a minus. The consumer declares `mount = "OrderedJson"` and writes `use OrderedJson::OrderedJson.{…}`. The mount is a `use`-line prefix only, and a type is still written `Json`.
+- The `package` table of `flix.toml` accepts only `version`, `repository`, and `flix` in 0.79 — `name`, `description`, and `licenses` there fail the manifest, which is why the license is carried by `LICENSE` and the file headers and not by the metadata.
+- `flix release` refuses without `repository`, takes its token from `--github-token`, a `.GITHUB_TOKEN` file at the root, or `GITHUB_TOKEN`, and publishes the tag `v<version>`. The `.fpkg` ships `README.md`, `flix.toml`, and `src/` and nothing else, so the README is the distributed documentation and `LICENSE` is not in the package.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `flix build` | compile |
-| `flix test` | 69 tests |
-| `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
+| `nix run .#check` \| `flix check` | type-check |
+| `nix run .#test` \| `flix test` | 69 tests |
+| `nix run .#build` \| `flix build` | compile |
+| `nix run .#pkg` \| `flix build-pkg` | an `.fpkg`, at `artifact/package.fpkg` |
+| `nix run .#doc` \| `flix doc` | API documentation, at `build/doc` |
+| `nix run .#clean` \| `flix clean` | remove `build/` and `artifact/` |
 | `flix release` | publish a version to GitHub |
 
-Flix is 0.79.0, the same as the consumer, and the toolchain is otherwise reached through the consumer's Nix flake (`nix develop`, or `nix develop --command flix …` from a checkout of it).
+Flix is 0.79.0, the same as the consumer's. The repository's own flake pins it, because nixos-26.05 carries 0.69.1 — on the wrong side of both the mount rule and the `package` table rule this library's install instructions are made of — and the pin is the consumer's own `overrideAttrs`, jar URL and hash included, so both build the same Flix version from the same jar. Not the same store path: each flake wraps the jar in its own nixpkgs' JDK, and the two lock different nixpkgs. `nix develop --command flix …` therefore works from a clone alone.
+
+CI runs `nix flake check`, `nix run .#test`, and `nix run .#pkg` on `main` and on every PR, beside a second job that runs `flix test` under the manifest's floor of 0.76.2 — as a jar, nixos-26.05 carrying only 0.69.1. There is no app for `release`: publishing a version stays a human act, and its token is never a repository secret.
 
 ## Verification
 

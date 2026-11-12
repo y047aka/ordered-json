@@ -148,8 +148,7 @@ pub mod OrderedJson {
     /// Appends an object written on the line its key stands on: a space inside
     /// each brace, `", "` between the entries, no line break.
     ///
-    /// The space inside the braces is a frozen byte: the consumer's committed
-    /// archive carries it, and `OneLine` would restamp 24,146 lap lines without it.
+    /// The space inside the braces is a frozen byte: every line already written under `OneLine` carries it, and removing it restamps them all.
     /// The values are written under `OneLine`, which breaks no line and so cannot
     /// change their bytes — only a value that itself fits on the line reaches here.
     ///
