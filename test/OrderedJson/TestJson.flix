@@ -2,9 +2,9 @@ mod OrderedJson.TestJson {
 
     use Assert.assertEq;
 
-    use OrderedJson.Json.{JArray, JBool, JNull, JNumber, JObject, JString}
+    use OrderedJson.Json.{JArray, JBool, JNull, JFloat, JInt, JObject, JString}
 
-    def num(n: Int32): OrderedJson.Json = JNumber(Int32.toBigDecimal(n))
+    def num(n: Int32): OrderedJson.Json = JInt(n)
 
     /////////////////////////////////////////////////////////////////////////////
     // toCompactString — primitives                                            //
@@ -36,7 +36,7 @@ mod OrderedJson.TestJson {
 
     @Test
     def toCompactString07(): Unit \ Assert =
-        assertEq(expected = "3.14", OrderedJson.toCompactString(JNumber(3.14ff)))
+        assertEq(expected = "3.14", OrderedJson.toCompactString(JFloat(3.14)))
 
     /////////////////////////////////////////////////////////////////////////////
     // toCompactString — strings (no escape needed)                            //
@@ -181,20 +181,20 @@ mod OrderedJson.TestJson {
 
     @Test
     def toCompactString31(): Unit \ Assert =
-        assertEq(expected = "{}", OrderedJson.toCompactString(JObject(Map#{})))
+        assertEq(expected = "{}", OrderedJson.toCompactString(JObject(Nil)))
 
     @Test
     def toCompactString32(): Unit \ Assert =
         assertEq(
             expected = "{\"a\":1}",
-            OrderedJson.toCompactString(JObject(Map#{"a" => num(1)}))
+            OrderedJson.toCompactString(JObject(("a", num(1)) :: Nil))
         )
 
     @Test
     def toCompactString33(): Unit \ Assert =
         assertEq(
             expected = "{\"a\":1,\"b\":2,\"c\":3}",
-            OrderedJson.toCompactString(JObject(Map#{"a" => num(1), "b" => num(2), "c" => num(3)}))
+            OrderedJson.toCompactString(JObject(("a", num(1)) :: ("b", num(2)) :: ("c", num(3)) :: Nil))
         )
 
     /////////////////////////////////////////////////////////////////////////////
@@ -227,7 +227,7 @@ mod OrderedJson.TestJson {
 
     @Test
     def toPrettyString06(): Unit \ Assert =
-        assertEq(expected = "{}", OrderedJson.toPrettyString(2, JObject(Map#{})))
+        assertEq(expected = "{}", OrderedJson.toPrettyString(2, JObject(Nil)))
 
     /////////////////////////////////////////////////////////////////////////////
     // toPrettyString — arrays                                                 //
@@ -255,14 +255,14 @@ mod OrderedJson.TestJson {
     def toPrettyString09(): Unit \ Assert =
         assertEq(
             expected = "{\n  \"a\": 1\n}",
-            OrderedJson.toPrettyString(2, JObject(Map#{"a" => num(1)}))
+            OrderedJson.toPrettyString(2, JObject(("a", num(1)) :: Nil))
         )
 
     @Test
     def toPrettyString10(): Unit \ Assert =
         assertEq(
             expected = "{\n  \"a\": 1,\n  \"b\": 2\n}",
-            OrderedJson.toPrettyString(2, JObject(Map#{"a" => num(1), "b" => num(2)}))
+            OrderedJson.toPrettyString(2, JObject(("a", num(1)) :: ("b", num(2)) :: Nil))
         )
 
     /////////////////////////////////////////////////////////////////////////////
@@ -290,12 +290,12 @@ mod OrderedJson.TestJson {
                 "    }\n" +
                 "  ]\n" +
                 "}",
-            OrderedJson.toPrettyString(2, JObject(Map#{
-                "users" => JArray(Vector#{
-                    JObject(Map#{"name" => JString("alice")}),
-                    JObject(Map#{"name" => JString("bob")})
-                })
-            }))
+            OrderedJson.toPrettyString(2, JObject(
+                ("users", JArray(Vector#{
+                    JObject(("name", JString("alice")) :: Nil),
+                    JObject(("name", JString("bob")) :: Nil)
+                })) :: Nil
+            ))
         )
 
     /////////////////////////////////////////////////////////////////////////////
