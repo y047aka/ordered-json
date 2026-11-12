@@ -61,4 +61,4 @@ Two things the frozen bytes pinned on the library instead. A collapsed object is
 
 ## License
 
-Apache 2.0, the same license as the Flix standard library. The module is that library's `Util/Json.flix` re-shaped around an ordered object, and the docstrings that still describe it are that file's; `src/OrderedJson.flix` says so at its top, and `LICENSE.md` is the file the standard library's own header points to. The standard library's own `TestJson.flix` is kept in `test/OrderedJson/`, reduced to the encoder, and still passes.
+Apache 2.0, the same license as the Flix standard library. The module is that library's `Util/Json.flix` re-shaped around an ordered object, and the docstrings that still describe it are that file's; `src/OrderedJson.flix` says so at its top, and its header points at this repository's `LICENSE`. The standard library's own `TestJson.flix` is kept in `test/OrderedJson/`, reduced to the encoder, and still passes.

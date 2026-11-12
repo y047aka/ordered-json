@@ -5,7 +5,7 @@
  * re-shaped around an ordered object. Its docstrings are kept where they still describe this file.
  *
  * Use of this source code is governed by the Apache 2.0 license
- * that can be found in the LICENSE.md file.
+ * that can be found in the LICENSE file.
  */
 
 ///
@@ -169,6 +169,10 @@ pub mod OrderedJson {
     ///
     /// The rule governs objects and not arrays, which is a frozen byte-level fact
     /// and not an oversight.
+    ///
+    /// `fits` is bound above the match that may discard it and costs nothing: a pure
+    /// `let` is call-by-need here, so under `Compact` and `Pretty` the walk is never
+    /// forced.
     ///
     def collapses(s: Style, kvs: List[(String, Json)]): Bool =
         let rule = match s {
