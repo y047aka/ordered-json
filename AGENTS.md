@@ -6,7 +6,7 @@ The JSON value that keeps an object's properties in the order they were authored
 
 - The library owns `OrderedJson.Json`, the traversal, the escaping, the number spelling, `Style`, `Inline`, and the `{ ... }` padding a collapsed object gets.
 - The consumer owns which layout its files use with which `Inline` rule — `Style.Inlined(Inline.AtMost(2), 2)` — and the fact that it appends a key (`index`, `position`) to a value another module wrote. Its `Extra` module does not come here; it only picks a layout now, which is what makes it the consumer's and not ours.
-- Where the standard module already named a function, a type, or a case, its name and argument order are reused. README's table is the inventory.
+- Where the standard module already named a function, a type, or a case, its name and argument order are reused. `flix doc` renders the public surface, and the module is the inventory.
 - Naming is decided: repo `ordered-json`, module `OrderedJson`, value type `OrderedJson.Json`, and the standard module's own case names. `JObject` naming a `Map` there and a `List` here is the trap to watch; the prefix is what keeps the two types apart at a call site.
 
 ## Facts about the standard library already paid for; do not re-derive them
