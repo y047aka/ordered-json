@@ -6,14 +6,28 @@ A JSON value that writes an object's properties in the order they were authored.
 
 The Flix standard `Util.Json` cannot write that. It holds an object as `JObject(Map[String, Json])`, and its own docstring says the map "gives canonical (sorted) key order on output". Its `JArray` is `Vector[Json]` and closed, so an ordered object cannot sit inside an array either — and real documents put ordered objects inside arrays: `drivers`, `entries`, `rounds`.
 
+## Install
+
+A Flix dependency is reached through a mount, and this repository's name cannot be one: a mount is a letter followed by letters, digits, or underscores, and the hyphen in `ordered-json` would read as a minus. So the mount is declared by hand, and the name to declare is `OrderedJson`. The module keeps its own name under the mount, which is why a caller writes it twice.
+
+    [dependencies]
+    "github:y047aka/ordered-json" = { version = "0.1.0", mount = "OrderedJson" }
+
+The version is the GitHub release, so `0.1.0` is the tag `v0.1.0`.
+
 ## The surface a caller needs
 
-    use OrderedJson.Json.{JNull, JBool, JNumber, JString, JArray, JObject}
+    use OrderedJson::OrderedJson.Json
+    use OrderedJson::OrderedJson.Json.{JNull, JBool, JNumber, JString, JArray, JObject}
+    use OrderedJson::OrderedJson.{toCompactString, toPrettyString, renderWith}
+    use OrderedJson::OrderedJson.{Inline, Style}
 
-    OrderedJson.toPrettyString(2, value)                          -- every value on a line of its own, as the standard module writes it
-    OrderedJson.toCompactString(value)                            -- no extraneous whitespace, as the standard module writes it
-    OrderedJson.renderWith(Style.Inlined(Inline.AtMost(2), 2), value) -- an object small enough to fit joins its key's line
-    OrderedJson.renderWith(Style.OneLine, value)                  -- one line, however many properties it holds
+    toPrettyString(2, value)                            -- every value on a line of its own, as the standard module writes it
+    toCompactString(value)                              -- no extraneous whitespace, as the standard module writes it
+    renderWith(Style.Inlined(Inline.AtMost(2), 2), value) -- an object small enough to fit joins its key's line
+    renderWith(Style.OneLine, value)                    -- one line, however many properties it holds
+
+The mount is a `use`-line prefix and nothing else: a signature writes the type `Json`, because 0.79 does not parse `OrderedJson::OrderedJson.Json` in a type position.
 
 ## Where the standard module's names are reused
 
@@ -58,7 +72,7 @@ The rule "an object of at most two properties, each of whose values fits on a li
 
 ## Consumed by
 
-`elm-motorsport-analysis` is where this came from, and it does not reference the library yet. When it does the check is byte identity — the five exported files hash the same before and after any change here, which is the only specification that has ever held. AGENTS.md carries the commands and the five hashes.
+`elm-motorsport-analysis` is where this came from, and it does not reference the library yet; the Install section is the coordinate and the mount it will reference. When it does the check is byte identity — the five exported files hash the same before and after any change here, which is the only specification that has ever held. AGENTS.md carries the commands and the five hashes.
 
 ## License
 

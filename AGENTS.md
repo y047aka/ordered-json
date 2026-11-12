@@ -26,7 +26,10 @@ The JSON value that keeps an object's properties in the order they were authored
 - `Util.Json` is the standard library's own module: a project may nest under it, which is why the module could live at `Util.Json.Encode`, but Flix 0.79 refuses a second declaration of it.
 - A Flix file must be named for the module it declares: `pub mod OrderedJson.JsonPath` lives at `src/OrderedJson/JsonPath.flix`, and a child module cannot be declared until its parent is. Flix reports both as `Mismatched module and file` and `Orphaned module`, and the errors cascade into hundreds.
 - Flix string literals have no `\b` or `\f`, but `\uXXXX` works, so a control character is written `"\u0008"` and not built with `Char.toString`. Char literals take both.
-- `flix install` resolves `owner/name[@ver]` from GitHub and `flix release` publishes there. There is no local-path dependency.
+- `flix install` resolves `owner/name[@ver]` from GitHub, and a dependency is declared as `"github:owner/name" = { version, mount }`. There is no local-path dependency.
+- A dependency is reached through a mount, and `ordered-json` cannot be one: a mount is a letter followed by letters, digits, or underscores, and a hyphen reads as a minus. The consumer declares `mount = "OrderedJson"` and writes `use OrderedJson::OrderedJson.{…}`. The mount is a `use`-line prefix only, and a type is still written `Json`.
+- The `package` table of `flix.toml` accepts only `version`, `repository`, and `flix` in 0.79 — `name`, `description`, and `licenses` there fail the manifest, which is why the license is carried by `LICENSE` and the file headers and not by the metadata.
+- `flix release` refuses without `repository`, takes its token from `--github-token`, a `.GITHUB_TOKEN` file at the root, or `GITHUB_TOKEN`, and publishes the tag `v<version>`. The `.fpkg` ships `README.md`, `flix.toml`, and `src/` and nothing else, so the README is the distributed documentation and `LICENSE` is not in the package.
 
 ## Commands
 
