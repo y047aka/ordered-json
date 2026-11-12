@@ -9,20 +9,16 @@ pub mod OrderedJson.TestStandard {
 
     def num(n: Int32): OrderedJson.Json = JNumber(Int32.toBigDecimal(n))
 
-    /// The one route from a spelled number to a `BigDecimal` that does not widen it, which is also the route `Util.Json.parse` takes.
-    def dec(s: String): OrderedJson.Json = match BigDecimal.fromString(s) {
-        case Some(d) => JNumber(d)
-        case None    => JNull
-    }
-
     /// The same document as `standard`, authored in the order `standard` spells it in.
+    ///
+    /// A `BigDecimal` literal keeps the scale it was written with, which is how `1.50ff` is `1.50` and not `1.5`.
     def document(): OrderedJson.Json =
         JObject(
             ("a", JNull) ::
             ("b", JArray(Vector#{num(1), JBool(true)})) ::
             ("c", JObject(("d", JString("x")) :: Nil)) ::
-            ("e", dec("0.20739060549440685")) ::
-            ("f", dec("1.50")) ::
+            ("e", JNumber(0.20739060549440685ff)) ::
+            ("f", JNumber(1.50ff)) ::
             Nil
         )
 
@@ -46,7 +42,10 @@ pub mod OrderedJson.TestStandard {
     /// The standard module's `instance ToString[Json]` writes the compact rendering, and this one does too.
     @Test
     def testToStringIsTheCompactRendering(): Unit \ Assert =
-        assertEq(expected = OrderedJson.toCompactString(document()), ToString.toString(document()))
+        match Util.Json.parse(standard()) {
+            case Result.Ok(j)  => assertEq(expected = Util.Json.toCompactString(j), ToString.toString(document()))
+            case Result.Err(_) => Assert.assertTrue(false)
+        }
 
     /// The one-line layout of this library is not the standard module's compact one: it keeps a space after every colon, and inside a collapsed object.
     @Test
