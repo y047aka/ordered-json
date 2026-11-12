@@ -1,7 +1,7 @@
-pub mod OrderedJson.TestValue {
+pub mod OrderedJson.Legacy.TestValue {
 
-    use OrderedJson.render
-    use OrderedJson.Json.{JsonNull, JsonBool, JsonInt, JsonFloat, JsonString, JsonArray, JsonObject}
+    use OrderedJson.Legacy.render
+    use OrderedJson.Legacy.Json.{JsonNull, JsonBool, JsonInt, JsonFloat, JsonString, JsonArray, JsonObject}
 
     @Test
     def testRenderNull(): Unit \ Assert =

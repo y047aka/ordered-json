@@ -1,16 +1,16 @@
 /// The property-count limit is the caller's, so it arrives as an argument, and `AtMost(2)` is the one the consumer's committed bytes froze.
-pub mod OrderedJson.TestLayout {
+pub mod OrderedJson.Legacy.TestLayout {
 
-    use OrderedJson.render
-    use OrderedJson.renderWith
-    use OrderedJson.Layout
-    use OrderedJson.Inline
-    use OrderedJson.Json.{JsonNull, JsonInt, JsonString, JsonArray, JsonObject}
+    use OrderedJson.Legacy.render
+    use OrderedJson.Legacy.renderWith
+    use OrderedJson.Legacy.Layout
+    use OrderedJson.Legacy.Inline
+    use OrderedJson.Legacy.Json.{JsonNull, JsonInt, JsonString, JsonArray, JsonObject}
 
-    def inlined(value: OrderedJson.Json): String =
+    def inlined(value: OrderedJson.Legacy.Json): String =
         renderWith(Layout.Inlined(Inline.AtMost(2)), 2, value)
 
-    def onOneLine(value: OrderedJson.Json): String =
+    def onOneLine(value: OrderedJson.Legacy.Json): String =
         renderWith(Layout.OneLine, 2, value)
 
     @Test
